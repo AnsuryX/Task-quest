@@ -149,13 +149,13 @@ class MainActivity : ComponentActivity() {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
                                         Icons.Default.LocalActivity,
-                                        contentDescription = "Ansury Quest Logo",
+                                        contentDescription = "TaskQuest Logo",
                                         tint = NeonCyan,
                                         modifier = Modifier.size(24.dp)
                                     )
                                     Spacer(Modifier.width(8.dp))
                                     Text(
-                                        text = "Ansury Quest",
+                                        text = "TaskQuest",
                                         style = MaterialTheme.typography.headlineSmall.copy(
                                             fontWeight = FontWeight.ExtraBold,
                                             letterSpacing = 0.5.sp
