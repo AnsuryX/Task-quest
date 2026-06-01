@@ -35,8 +35,13 @@ import com.example.ui.screens.QuestLogScreen
 import com.example.ui.theme.*
 import com.example.ui.viewmodel.QuestViewModel
 import com.example.ui.viewmodel.QuestViewModelFactory
+import com.example.util.NotificationAndSoundHelper
 
 class MainActivity : ComponentActivity() {
+
+    private val requestPermissionLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { _ -> }
 
     private val viewModel: QuestViewModel by viewModels {
         QuestViewModelFactory((application as TaskQuestApplication).repository)
@@ -46,11 +51,82 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        // Gracefully request POST_NOTIFICATIONS permission at app launch on Android 13+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            requestPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+
         setContent {
             // Dark mode state
             var isDarkTheme by remember { mutableStateOf(true) }
 
             TaskQuestTheme(darkTheme = isDarkTheme) {
+                // Initialize high priority notification channels to ensure sound and alarm vibrate
+                NotificationAndSoundHelper.createNotificationChannels(this@MainActivity)
+
+                // Respond to sound, alert, and DND silencer systems based on session transitions
+                LaunchedEffect(Unit) {
+                    viewModel.uiEvents.collect { event ->
+                        when (event) {
+                            is QuestViewModel.QuestUiEvent.TimerStarted -> {
+                                if (event.mode == "work" && event.isShieldEnabled) {
+                                    NotificationAndSoundHelper.setSystemDndMode(this@MainActivity, true)
+                                }
+                                NotificationAndSoundHelper.playShieldEngagedSound()
+                            }
+                            is QuestViewModel.QuestUiEvent.TimerPaused -> {
+                                NotificationAndSoundHelper.setSystemDndMode(this@MainActivity, false)
+                                NotificationAndSoundHelper.playShieldDisengagedSound()
+                            }
+                            is QuestViewModel.QuestUiEvent.TimerFinished -> {
+                                NotificationAndSoundHelper.setSystemDndMode(this@MainActivity, false)
+                                when (event.mode) {
+                                    "work" -> {
+                                        NotificationAndSoundHelper.playWorkFinishedSound(this@MainActivity)
+                                        NotificationAndSoundHelper.sendNotification(
+                                            context = this@MainActivity,
+                                            channelId = NotificationAndSoundHelper.CHANNEL_POMODORO_ID,
+                                            notificationId = 101,
+                                            title = "⚔️ Quest Succeeded!",
+                                            text = "Work session cleared. +3x Shield XP Gained. Take a break!"
+                                        )
+                                    }
+                                    "short_break" -> {
+                                        NotificationAndSoundHelper.playBreakFinishedSound(this@MainActivity)
+                                        NotificationAndSoundHelper.sendNotification(
+                                            context = this@MainActivity,
+                                            channelId = NotificationAndSoundHelper.CHANNEL_POMODORO_ID,
+                                            notificationId = 102,
+                                            title = "🔔 Break Over!",
+                                            text = "Rest period finished. Ready to conquer your next quest?"
+                                        )
+                                    }
+                                    "long_break" -> {
+                                        NotificationAndSoundHelper.playBreakFinishedSound(this@MainActivity)
+                                        NotificationAndSoundHelper.sendNotification(
+                                            context = this@MainActivity,
+                                            channelId = NotificationAndSoundHelper.CHANNEL_POMODORO_ID,
+                                            notificationId = 103,
+                                            title = "🔔 Rest Concluded!",
+                                            text = "Your long break has cleared. Return to combat?"
+                                        )
+                                    }
+                                }
+                            }
+                            is QuestViewModel.QuestUiEvent.LevelUp -> {
+                                NotificationAndSoundHelper.playLevelUpSound()
+                                NotificationAndSoundHelper.sendNotification(
+                                    context = this@MainActivity,
+                                    channelId = NotificationAndSoundHelper.CHANNEL_ALERTS_ID,
+                                    notificationId = 201,
+                                    title = "🎉 CHARACTER LEVEL UP!",
+                                    text = "Congratulations! You have elevated to a higher tier of productivity master!"
+                                )
+                            }
+                        }
+                    }
+                }
+
                 val stats by viewModel.userStats.collectAsState()
                 var currentNavIndex by remember { mutableStateOf(0) } // 0 = Dashboard, 1 = Quest Log, 2 = Focus Chamber
 
@@ -73,13 +149,13 @@ class MainActivity : ComponentActivity() {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
                                         Icons.Default.LocalActivity,
-                                        contentDescription = "TaskQuest Logo",
+                                        contentDescription = "Ansury Quest Logo",
                                         tint = NeonCyan,
                                         modifier = Modifier.size(24.dp)
                                     )
                                     Spacer(Modifier.width(8.dp))
                                     Text(
-                                        text = "TaskQuest",
+                                        text = "Ansury Quest",
                                         style = MaterialTheme.typography.headlineSmall.copy(
                                             fontWeight = FontWeight.ExtraBold,
                                             letterSpacing = 0.5.sp

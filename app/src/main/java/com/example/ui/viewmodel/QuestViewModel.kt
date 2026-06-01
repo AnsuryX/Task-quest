@@ -17,9 +17,12 @@ import com.example.data.model.WeeklyReflection
 import com.example.data.repository.QuestRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -55,6 +58,19 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
     val weeklyReflections: StateFlow<List<WeeklyReflection>> = repository.allWeeklyReflections
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // --- Quest UI Events ---
+    sealed class QuestUiEvent {
+        data class TimerStarted(val mode: String, val isShieldEnabled: Boolean) : QuestUiEvent()
+        data class TimerPaused(val mode: String) : QuestUiEvent()
+        data class TimerFinished(val mode: String) : QuestUiEvent()
+        object LevelUp : QuestUiEvent()
+    }
+
+    private val _uiEvents = MutableSharedFlow<QuestUiEvent>()
+    val uiEvents: SharedFlow<QuestUiEvent> = _uiEvents.asSharedFlow()
+
+    private var lastKnownLevel: Int? = null
+
     // --- Pomodoro and Focus Shield State Variables ---
     var countDownSeconds by mutableStateOf(1500) // default 25 minutes
         private set
@@ -82,6 +98,18 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
         private set
 
     init {
+        // Monitor level progression for sound and animation triggers
+        viewModelScope.launch {
+            userStats.collect { stats ->
+                if (stats != null) {
+                    if (lastKnownLevel != null && stats.level > lastKnownLevel!!) {
+                        _uiEvents.emit(QuestUiEvent.LevelUp)
+                    }
+                    lastKnownLevel = stats.level
+                }
+            }
+        }
+
         // Run first trigger of stats setup and quick companion reminder
         viewModelScope.launch {
             // Seed a default task and goal if empty
@@ -120,6 +148,9 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
             isSuppressionActive = true
             companionNudge = "🔊 DISTRACTIONS SILENCED: Focus Shield engaged. Crush your objectives, Hero!"
         }
+        viewModelScope.launch {
+            _uiEvents.emit(QuestUiEvent.TimerStarted(pomodoroMode, isFocusZoneEnabled))
+        }
         timerJob = viewModelScope.launch {
             while (countDownSeconds > 0 && isTimerRunning) {
                 delay(1000)
@@ -135,6 +166,9 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
         isTimerRunning = false
         isSuppressionActive = false
         timerJob?.cancel()
+        viewModelScope.launch {
+            _uiEvents.emit(QuestUiEvent.TimerPaused(pomodoroMode))
+        }
     }
 
     fun setTimerMode(mode: String) {
@@ -152,6 +186,11 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
         isTimerRunning = false
         isSuppressionActive = false
         timerJob?.cancel()
+        
+        val finishedMode = pomodoroMode
+        viewModelScope.launch {
+            _uiEvents.emit(QuestUiEvent.TimerFinished(finishedMode))
+        }
         
         viewModelScope.launch {
             val duration = when (pomodoroMode) {
