@@ -66,6 +66,7 @@ class MainActivity : ComponentActivity() {
 
                 // Respond to sound, alert, and DND silencer systems based on session transitions
                 LaunchedEffect(Unit) {
+                    viewModel.loadPreferences(this@MainActivity)
                     viewModel.uiEvents.collect { event ->
                         when (event) {
                             is QuestViewModel.QuestUiEvent.TimerStarted -> {
@@ -82,7 +83,7 @@ class MainActivity : ComponentActivity() {
                                 NotificationAndSoundHelper.setSystemDndMode(this@MainActivity, false)
                                 when (event.mode) {
                                     "work" -> {
-                                        NotificationAndSoundHelper.playWorkFinishedSound(this@MainActivity)
+                                        NotificationAndSoundHelper.playWorkFinishedCustomSound(this@MainActivity, viewModel.workSoundThemeSetting)
                                         NotificationAndSoundHelper.sendNotification(
                                             context = this@MainActivity,
                                             channelId = NotificationAndSoundHelper.CHANNEL_POMODORO_ID,
@@ -92,7 +93,7 @@ class MainActivity : ComponentActivity() {
                                         )
                                     }
                                     "short_break" -> {
-                                        NotificationAndSoundHelper.playBreakFinishedSound(this@MainActivity)
+                                        NotificationAndSoundHelper.playBreakFinishedCustomSound(this@MainActivity, viewModel.breakSoundThemeSetting)
                                         NotificationAndSoundHelper.sendNotification(
                                             context = this@MainActivity,
                                             channelId = NotificationAndSoundHelper.CHANNEL_POMODORO_ID,
@@ -102,7 +103,7 @@ class MainActivity : ComponentActivity() {
                                         )
                                     }
                                     "long_break" -> {
-                                        NotificationAndSoundHelper.playBreakFinishedSound(this@MainActivity)
+                                        NotificationAndSoundHelper.playBreakFinishedCustomSound(this@MainActivity, viewModel.breakSoundThemeSetting)
                                         NotificationAndSoundHelper.sendNotification(
                                             context = this@MainActivity,
                                             channelId = NotificationAndSoundHelper.CHANNEL_POMODORO_ID,
@@ -129,6 +130,14 @@ class MainActivity : ComponentActivity() {
 
                 val stats by viewModel.userStats.collectAsState()
                 var currentNavIndex by remember { mutableStateOf(0) } // 0 = Dashboard, 1 = Quest Log, 2 = Focus Chamber
+                var showSettingsDialog by remember { mutableStateOf(false) }
+
+                if (showSettingsDialog) {
+                    com.example.ui.screens.SettingsDialog(
+                        viewModel = viewModel,
+                        onDismiss = { showSettingsDialog = false }
+                    )
+                }
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
@@ -149,13 +158,13 @@ class MainActivity : ComponentActivity() {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
                                         Icons.Default.LocalActivity,
-                                        contentDescription = "TaskQuest Logo",
+                                        contentDescription = "Ansury Quest Logo",
                                         tint = NeonCyan,
                                         modifier = Modifier.size(24.dp)
                                     )
                                     Spacer(Modifier.width(8.dp))
                                     Text(
-                                        text = "TaskQuest",
+                                        text = "Ansury Quest",
                                         style = MaterialTheme.typography.headlineSmall.copy(
                                             fontWeight = FontWeight.ExtraBold,
                                             letterSpacing = 0.5.sp
@@ -164,19 +173,34 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                                 
-                                // Reset stats button for gamified debugging
-                                IconButton(
-                                    onClick = { 
-                                        // Just a nice gamified helper: tap app icon to refresh companion
-                                        viewModel.triggerCompanionNudge() 
-                                    },
-                                    modifier = Modifier.testTag("app_logo_tap")
-                                ) {
-                                    Icon(
-                                        Icons.Default.HelpOutline, 
-                                        contentDescription = "Info",
-                                        tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
-                                    )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    // Settings Gear Button
+                                    IconButton(
+                                        onClick = { showSettingsDialog = true },
+                                        modifier = Modifier.testTag("settings_gear_button")
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Settings,
+                                            contentDescription = "Settings & Cloud Sync",
+                                            tint = NeonAmber,
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                    }
+
+                                    // Reset stats button for gamified debugging
+                                    IconButton(
+                                        onClick = { 
+                                            // Just a nice gamified helper: tap app icon to refresh companion
+                                            viewModel.triggerCompanionNudge() 
+                                        },
+                                        modifier = Modifier.testTag("app_logo_tap")
+                                    ) {
+                                        Icon(
+                                            Icons.Default.HelpOutline, 
+                                            contentDescription = "Info",
+                                            tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                                        )
+                                    }
                                 }
                             }
 

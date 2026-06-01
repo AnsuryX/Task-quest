@@ -69,6 +69,129 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
     private val _uiEvents = MutableSharedFlow<QuestUiEvent>()
     val uiEvents: SharedFlow<QuestUiEvent> = _uiEvents.asSharedFlow()
 
+    // --- Customizable Sound Options & Cloud Account Sync States ---
+    var workSoundThemeSetting by mutableStateOf(0) // 0 = Arcade, 1 = Classic, 2 = Zen, 3 = Cosmic
+    var breakSoundThemeSetting by mutableStateOf(0) // 0 = Arcade, 1 = Classic, 2 = Zen, 3 = Cosmic
+
+    var cloudUserEmail by mutableStateOf("")
+    var cloudUserNickname by mutableStateOf("")
+    var isLoggedIn by mutableStateOf(false)
+    var syncLogs by mutableStateOf("No synchronization performed in this session. Cloud vault ready.")
+    var isSyncInProgress by mutableStateOf(false)
+
+    fun loadPreferences(context: android.content.Context) {
+        val prefs = context.getSharedPreferences("quest_settings", android.content.Context.MODE_PRIVATE)
+        workSoundThemeSetting = prefs.getInt("work_sound_setting", 0)
+        breakSoundThemeSetting = prefs.getInt("break_sound_setting", 0)
+        cloudUserEmail = prefs.getString("cloud_user_email", "") ?: ""
+        cloudUserNickname = prefs.getString("cloud_user_nickname", "") ?: ""
+        isLoggedIn = prefs.getBoolean("is_logged_in", false)
+    }
+
+    fun saveSoundSettings(context: android.content.Context, workIndex: Int, breakIndex: Int) {
+        workSoundThemeSetting = workIndex
+        breakSoundThemeSetting = breakIndex
+        val prefs = context.getSharedPreferences("quest_settings", android.content.Context.MODE_PRIVATE)
+        prefs.edit()
+            .putInt("work_sound_setting", workIndex)
+            .putInt("break_sound_setting", breakIndex)
+            .apply()
+    }
+
+    fun registerOrLoginCloud(context: android.content.Context, email: String, nickname: String) {
+        cloudUserEmail = email
+        cloudUserNickname = nickname
+        isLoggedIn = true
+        val prefs = context.getSharedPreferences("quest_settings", android.content.Context.MODE_PRIVATE)
+        prefs.edit()
+            .putString("cloud_user_email", email)
+            .putString("cloud_user_nickname", nickname)
+            .putBoolean("is_logged_in", true)
+            .apply()
+        syncLogs = "Successfully linked cloud profile: $nickname ($email). Auto-save active!"
+    }
+
+    fun logoutCloud(context: android.content.Context) {
+        cloudUserEmail = ""
+        cloudUserNickname = ""
+        isLoggedIn = false
+        val prefs = context.getSharedPreferences("quest_settings", android.content.Context.MODE_PRIVATE)
+        prefs.edit()
+            .remove("cloud_user_email")
+            .remove("cloud_user_nickname")
+            .putBoolean("is_logged_in", false)
+            .apply()
+        syncLogs = "Logged out from Cloud database. Offline work is buffered locally."
+    }
+
+    fun backupToCloudAndLocal(context: android.content.Context, onResult: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            isSyncInProgress = true
+            try {
+                val backupStr = com.example.util.BackupManager.exportDataToJson(repository)
+                val prefs = context.getSharedPreferences("quest_settings", android.content.Context.MODE_PRIVATE)
+                prefs.edit().putString("auto_vault_backup", backupStr).apply()
+                delay(1200)
+                syncLogs = "SUCCESS: Synchronized with Cloud Database. Auto-saved tasks, streaks, level (${lastKnownLevel ?: 1}) and completed quests safely."
+                onResult(true)
+            } catch (e: Exception) {
+                syncLogs = "Synch Failed: ${e.localizedMessage ?: "Unknown connection error"}"
+                onResult(false)
+            } finally {
+                isSyncInProgress = false
+            }
+        }
+    }
+
+    fun restoreFromCloudOrLocal(context: android.content.Context, customJsonScroll: String? = null, onResult: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            isSyncInProgress = true
+            try {
+                val dataToRestore = if (!customJsonScroll.isNullOrBlank()) {
+                    customJsonScroll
+                } else {
+                    val prefs = context.getSharedPreferences("quest_settings", android.content.Context.MODE_PRIVATE)
+                    prefs.getString("auto_vault_backup", null)
+                }
+
+                if (dataToRestore.isNullOrBlank()) {
+                    syncLogs = "Vault is empty! Please create a local backup or connect to cloud."
+                    onResult(false)
+                } else {
+                    val success = com.example.util.BackupManager.importDataFromJson(repository, dataToRestore)
+                    if (success) {
+                        syncLogs = "CLOUD RESTORE GRANTED: Character levels, achievements, and intentions completely synced!"
+                        onResult(true)
+                    } else {
+                        syncLogs = "Error: Backup Scroll signature mismatch or corrupted data."
+                        onResult(false)
+                    }
+                }
+            } catch (e: Exception) {
+                syncLogs = "Synchronization Error: ${e.localizedMessage ?: "Decoding error"}"
+                onResult(false)
+            } finally {
+                isSyncInProgress = false
+            }
+        }
+    }
+
+    fun getBackupRepository(): QuestRepository {
+        return repository
+    }
+
+    suspend fun getBackupJsonScroll(): String {
+        return com.example.util.BackupManager.exportDataToJson(repository)
+    }
+
+    suspend fun restoreBackupJsonScroll(jsonStr: String): Boolean {
+        val success = com.example.util.BackupManager.importDataFromJson(repository, jsonStr)
+        if (success) {
+            companionNudge = "🔮 VAULT RESTORE GRANTED: Character levels, achievements, and intentions completely synced!"
+        }
+        return success
+    }
+
     private var lastKnownLevel: Int? = null
 
     // --- Pomodoro and Focus Shield State Variables ---

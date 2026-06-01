@@ -152,4 +152,18 @@ class QuestRepository(private val questDao: QuestDao) {
     suspend fun resetUserStats() {
         questDao.insertUserStats(UserStats(id = 1, level = 1, xp = 0, streakDays = 1, focusMinutesTotal = 0, questsCompleted = 0))
     }
+
+    suspend fun insertUserStats(stats: UserStats) {
+        questDao.insertUserStats(stats)
+    }
+
+    suspend fun clearAllDatabaseTables() {
+        questDao.clearTasks()
+        questDao.clearGoals()
+        questDao.clearPomodoroSessions()
+        questDao.clearUserStats()
+        questDao.clearIntentions()
+        questDao.clearCommitmentContracts()
+        questDao.clearWeeklyReflections()
+    }
 }

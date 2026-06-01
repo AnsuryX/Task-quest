@@ -92,47 +92,94 @@ object NotificationAndSoundHelper {
     }
 
     // --- High Fidelity Arcade Game Sound Synthesizers via ToneGenerator ---
-
+    
     /**
-     * Plays a triumphant, retro arcade game chime for completed work sessions.
+     * Plays a customizable chime based on selected user sound preference theme for completed work.
      */
-    fun playWorkFinishedSound(context: Context) {
-        // Play synthetic chord in background
+    fun playWorkFinishedCustomSound(context: Context, themeIndex: Int) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val tg = ToneGenerator(AudioManager.STREAM_ALARM, 100)
-                tg.startTone(ToneGenerator.TONE_CDMA_ALERT_INCALL_LITE, 200)
-                delay(250)
-                tg.startTone(ToneGenerator.TONE_CDMA_PIP, 150)
-                delay(150)
-                tg.startTone(ToneGenerator.TONE_CDMA_HIGH_L, 300)
+                when (themeIndex) {
+                    0 -> { // Arcade
+                        tg.startTone(ToneGenerator.TONE_CDMA_ALERT_INCALL_LITE, 200)
+                        delay(250)
+                        tg.startTone(ToneGenerator.TONE_CDMA_PIP, 150)
+                        delay(150)
+                        tg.startTone(ToneGenerator.TONE_CDMA_HIGH_L, 300)
+                    }
+                    1 -> { // Classic Digital
+                        for (i in 1..4) {
+                            tg.startTone(ToneGenerator.TONE_SUP_DIAL, 80)
+                            delay(160)
+                        }
+                    }
+                    2 -> { // Zen Gong
+                        tg.startTone(ToneGenerator.TONE_CDMA_HIGH_L, 800)
+                    }
+                    3 -> { // Cosmic Wave
+                        tg.startTone(ToneGenerator.TONE_PROP_PROMPT, 150)
+                        delay(120)
+                        tg.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 300)
+                        delay(320)
+                        tg.startTone(ToneGenerator.TONE_CDMA_HIGH_L, 200)
+                    }
+                }
                 tg.release()
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
-
-        // Play standard system alarm for 2 seconds so they also get device sound
-        playDefaultDeviceSound(context, RingtoneManager.TYPE_ALARM, 2200)
+        playDefaultDeviceSound(context, RingtoneManager.TYPE_ALARM, 1800)
     }
 
     /**
-     * Plays a breezy, light double ding for completed break durations.
+     * Plays a customizable chime based on selected user sound preference theme for completed break.
      */
-    fun playBreakFinishedSound(context: Context) {
+    fun playBreakFinishedCustomSound(context: Context, themeIndex: Int) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val tg = ToneGenerator(AudioManager.STREAM_ALARM, 100)
-                tg.startTone(ToneGenerator.TONE_CDMA_CONFIRM, 200)
-                delay(200)
-                tg.startTone(ToneGenerator.TONE_CDMA_PIP, 250)
+                when (themeIndex) {
+                    0 -> { // Arcade
+                        tg.startTone(ToneGenerator.TONE_CDMA_CONFIRM, 200)
+                        delay(200)
+                        tg.startTone(ToneGenerator.TONE_CDMA_PIP, 250)
+                    }
+                    1 -> { // Classic Digital
+                        tg.startTone(ToneGenerator.TONE_SUP_DIAL, 120)
+                        delay(180)
+                        tg.startTone(ToneGenerator.TONE_SUP_DIAL, 120)
+                    }
+                    2 -> { // Zen Gong
+                        tg.startTone(ToneGenerator.TONE_CDMA_PIP, 400)
+                    }
+                    3 -> { // Cosmic Wave
+                        tg.startTone(ToneGenerator.TONE_CDMA_PIP, 100)
+                        delay(120)
+                        tg.startTone(ToneGenerator.TONE_SUP_PIP, 200)
+                    }
+                }
                 tg.release()
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
+        playDefaultDeviceSound(context, RingtoneManager.TYPE_NOTIFICATION, 1200)
+    }
 
-        playDefaultDeviceSound(context, RingtoneManager.TYPE_NOTIFICATION, 1500)
+    /**
+     * Plays a triumphant, retro arcade game chime for completed work sessions (fallback).
+     */
+    fun playWorkFinishedSound(context: Context) {
+        playWorkFinishedCustomSound(context, 0)
+    }
+
+    /**
+     * Plays a breezy, light double ding for completed break durations (fallback).
+     */
+    fun playBreakFinishedSound(context: Context) {
+        playBreakFinishedCustomSound(context, 0)
     }
 
     /**

@@ -97,4 +97,26 @@ interface QuestDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertWeeklyReflection(reflection: WeeklyReflection): Long
+
+    // --- Bulk Clearing Queries for Backups ---
+    @Query("DELETE FROM tasks")
+    suspend fun clearTasks()
+
+    @Query("DELETE FROM goals")
+    suspend fun clearGoals()
+
+    @Query("DELETE FROM pomodoro_sessions")
+    suspend fun clearPomodoroSessions()
+
+    @Query("DELETE FROM user_stats")
+    suspend fun clearUserStats()
+
+    @Query("DELETE FROM implementation_intentions")
+    suspend fun clearIntentions()
+
+    @Query("DELETE FROM commitment_contracts")
+    suspend fun clearCommitmentContracts()
+
+    @Query("DELETE FROM weekly_reflections")
+    suspend fun clearWeeklyReflections()
 }

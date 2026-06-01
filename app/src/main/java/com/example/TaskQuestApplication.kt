@@ -3,7 +3,6 @@ package com.example
 import android.app.Application
 import com.example.data.database.QuestDatabase
 import com.example.data.repository.QuestRepository
-import com.example.util.NotificationAndSoundHelper
 
 class TaskQuestApplication : Application() {
 
@@ -12,7 +11,5 @@ class TaskQuestApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        // Initialize notification channels for the entire app life cycle
-        NotificationAndSoundHelper.createNotificationChannels(this)
     }
 }
