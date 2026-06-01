@@ -1,0 +1,28 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Radiant Crest Star -->
+    <path
+        android:fillColor="#00FFE0"
+        android:pathData="M54,8 L57,20 L69,23 L57,26 L54,38 L51,26 L39,23 L51,20 Z" />
+    
+    <!-- Heroic TaskShield -->
+    <path
+        android:fillColor="#9F5FFF"
+        android:pathData="M30,30 L78,30 L78,54 C78,70 54,86 54,86 C54,86 30,70 30,54 Z" />
+
+    <!-- Sharp Glowing Inner Shield -->
+    <path
+        android:fillColor="#1E2538"
+        android:pathData="M36,36 L72,36 L72,52 C72,64 54,76 54,76 C54,76 36,64 36,52 Z" />
+
+    <!-- Task Victory Mark -->
+    <path
+        android:pathData="M44,54 L51,61 L64,44"
+        android:strokeColor="#00FFE0"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>
