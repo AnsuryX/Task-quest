@@ -10,6 +10,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -31,6 +33,20 @@ import com.example.ui.theme.*
 import com.example.ui.viewmodel.AiReportState
 import com.example.ui.viewmodel.QuestViewModel
 
+data class RangerBadge(
+    val id: String,
+    val title: String,
+    val category: String,
+    val icon: String,
+    val description: String,
+    val current: Int,
+    val target: Int,
+    val color: Color
+) {
+    val isUnlocked: Boolean get() = current >= target
+    val progress: Float get() = if (target > 0) (current.toFloat() / target.toFloat()).coerceIn(0f, 1f) else 0f
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
@@ -46,8 +62,124 @@ fun DashboardScreen(
     val goals by viewModel.goals.collectAsState()
     val stats by viewModel.userStats.collectAsState()
     val aiState by viewModel.aiReportState.collectAsState()
+    val tasks by viewModel.tasks.collectAsState()
+    val intentions by viewModel.intentions.collectAsState()
+    val commitmentContracts by viewModel.commitmentContracts.collectAsState()
 
     var showAddGoalDialog by remember { mutableStateOf(false) }
+    var isCodexExpanded by remember { mutableStateOf(false) }
+    var codexFilterIndex by remember { mutableStateOf(0) } // 0 = All, 1 = Unlocked, 2 = Locked
+
+    val badges = remember(stats, tasks, intentions, commitmentContracts, goals, NeonCyan, NeonPurple, NeonAmber, NeonRose, NeonGreen) {
+        val completedQuestsCount = stats?.questsCompleted ?: 0
+        val totalFocusMin = stats?.focusMinutesTotal ?: 0
+        val totalFocusZoneMin = stats?.totalFocusZoneMinutes ?: 0
+        val activeStreak = stats?.streakDays ?: 1
+        val level = stats?.level ?: 1
+        
+        listOf(
+            RangerBadge(
+                id = "initiate_crest",
+                title = "Initiate's Crest",
+                category = "Quest Mastery",
+                icon = "⚔️",
+                description = "Enlist and resolve your first quest.",
+                current = completedQuestsCount,
+                target = 1,
+                color = NeonCyan
+            ),
+            RangerBadge(
+                id = "iron_ranger",
+                title = "Iron Ranger",
+                category = "Quest Mastery",
+                icon = "🛡️",
+                description = "Prove your mettle by completing 10 quests.",
+                current = completedQuestsCount,
+                target = 10,
+                color = NeonPurple
+            ),
+            RangerBadge(
+                id = "zen_disciple",
+                title = "Zen Disciple",
+                category = "Focus Meditation",
+                icon = "🧘",
+                description = "Focus inside the pomodoro chamber for 60 minutes.",
+                current = totalFocusMin,
+                target = 60,
+                color = NeonAmber
+            ),
+            RangerBadge(
+                id = "stamina_sage",
+                title = "Stamina Sage",
+                category = "Focus Meditation",
+                icon = "🕯️",
+                description = "Sustain focus for a total of 300 minutes.",
+                current = totalFocusMin,
+                target = 300,
+                color = NeonRose
+            ),
+            RangerBadge(
+                id = "guardian_shield",
+                title = "Shield Guardian",
+                category = "Quantum Shield",
+                icon = "🌀",
+                description = "Lock down systems with Focus Shield DND for 30 minutes total.",
+                current = totalFocusZoneMin,
+                target = 30,
+                color = NeonCyan
+            ),
+            RangerBadge(
+                id = "habit_alchemist",
+                title = "Habit Alchemist",
+                category = "Planning Rituals",
+                icon = "🧪",
+                description = "Forge 3 multi-environmental If-Then planners.",
+                current = intentions.size,
+                target = 3,
+                color = NeonGreen
+            ),
+            RangerBadge(
+                id = "commitment_paladin",
+                title = "Commitment Paladin",
+                category = "Oaths of Stakes",
+                icon = "💎",
+                description = "Establish a XP Staked commitment contract.",
+                current = commitmentContracts.size,
+                target = 1,
+                color = NeonRose
+            ),
+            RangerBadge(
+                id = "aspiration_forger",
+                title = "Aspiration Forger",
+                category = "Plan Horizon",
+                icon = "🌟",
+                description = "Establish 3 multi-sector life goals.",
+                current = goals.size,
+                target = 3,
+                color = NeonAmber
+            ),
+            RangerBadge(
+                id = "phoenix_ascendant",
+                title = "Phoenix Ascendant",
+                category = "Ranger Streaks",
+                icon = "🔥",
+                description = "Maintain a 3-day active streak in the matrix.",
+                current = activeStreak,
+                target = 3,
+                color = Quadrant1Color
+            ),
+            RangerBadge(
+                id = "grand_ranger",
+                title = "Grand Ranger",
+                category = "Level Elevation",
+                icon = "👑",
+                description = "Ascend your character to Level 3.",
+                current = level,
+                target = 3,
+                color = NeonPurple
+            )
+        )
+    }
 
     LazyColumn(
         modifier = modifier
@@ -305,6 +437,243 @@ fun DashboardScreen(
                                 }
                             }
                             Spacer(Modifier.height(12.dp))
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- GAMIFIED ACCOMPLISHMENTS: RANGER CODEX ---
+        item {
+            val unlockedCount = badges.count { it.isUnlocked }
+            val filteredBadges = remember(badges, codexFilterIndex) {
+                when (codexFilterIndex) {
+                    1 -> badges.filter { it.isUnlocked }
+                    2 -> badges.filter { !it.isUnlocked }
+                    else -> badges
+                }
+            }
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("ranger_codex_card"),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                border = BorderStroke(1.dp, NeonCyan.copy(alpha = 0.25f))
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    // Header Row
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { isCodexExpanded = !isCodexExpanded }
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "🏆",
+                                fontSize = 24.sp,
+                                modifier = Modifier.padding(end = 10.dp)
+                            )
+                            Column {
+                                Text(
+                                    text = "RANGER CODEX",
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.ExtraBold,
+                                        letterSpacing = 0.5.sp
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "Completed: $unlockedCount / ${badges.size} Milestones",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (unlockedCount == badges.size) NeonGreen else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                )
+                            }
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (unlockedCount == badges.size) NeonGreen.copy(alpha = 0.15f) else NeonCyan.copy(alpha = 0.12f),
+                                modifier = Modifier.padding(end = 6.dp)
+                            ) {
+                                Text(
+                                    text = "${((unlockedCount.toFloat() / badges.size.toFloat()) * 100).toInt()}% CLR",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = if (unlockedCount == badges.size) NeonGreen else NeonCyan,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                            Icon(
+                                imageVector = if (isCodexExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = "Toggle Codex",
+                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        }
+                    }
+
+                    AnimatedVisibility(visible = isCodexExpanded) {
+                        Column {
+                            Spacer(Modifier.height(14.dp))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            Spacer(Modifier.height(12.dp))
+
+                            // Filter Chips Row
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                FilterChip(
+                                    selected = codexFilterIndex == 0,
+                                    onClick = { codexFilterIndex = 0 },
+                                    label = { Text("All (${badges.size})", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                                    modifier = Modifier.testTag("codex_filter_all")
+                                )
+                                FilterChip(
+                                    selected = codexFilterIndex == 1,
+                                    onClick = { codexFilterIndex = 1 },
+                                    label = { Text("Unlocked ($unlockedCount)", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                                    modifier = Modifier.testTag("codex_filter_unlocked")
+                                )
+                                FilterChip(
+                                    selected = codexFilterIndex == 2,
+                                    onClick = { codexFilterIndex = 2 },
+                                    label = { Text("Locked (${badges.size - unlockedCount})", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                                    modifier = Modifier.testTag("codex_filter_locked")
+                                )
+                            }
+
+                            Spacer(Modifier.height(12.dp))
+
+                            if (filteredBadges.isEmpty()) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "No milestones in this class yet.",
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                    )
+                                }
+                            } else {
+                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    filteredBadges.forEach { badge ->
+                                        val isUnlocked = badge.isUnlocked
+                                        Card(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .testTag("badge_${badge.id}"),
+                                            colors = CardDefaults.cardColors(
+                                                containerColor = if (isUnlocked) {
+                                                    badge.color.copy(alpha = 0.05f)
+                                                } else {
+                                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                                                }
+                                            ),
+                                            border = BorderStroke(
+                                                width = 1.dp,
+                                                color = if (isUnlocked) badge.color.copy(alpha = 0.4f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f)
+                                            ),
+                                            shape = RoundedCornerShape(12.dp)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(12.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                // Badge Icon with circle background
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(44.dp)
+                                                        .background(
+                                                            color = if (isUnlocked) badge.color.copy(alpha = 0.15f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
+                                                            shape = CircleShape
+                                                        ),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = if (isUnlocked) badge.icon else "🔒",
+                                                        fontSize = 20.sp
+                                                    )
+                                                }
+
+                                                Spacer(Modifier.width(12.dp))
+
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Text(
+                                                            text = badge.title,
+                                                            fontSize = 13.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = if (isUnlocked) badge.color else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                                        )
+                                                        Text(
+                                                            text = badge.category.uppercase(),
+                                                            fontSize = 9.sp,
+                                                            fontWeight = FontWeight.ExtraBold,
+                                                            color = badge.color.copy(alpha = 0.8f),
+                                                            letterSpacing = 0.5.sp
+                                                        )
+                                                    }
+                                                    Spacer(Modifier.height(2.dp))
+                                                    Text(
+                                                        text = badge.description,
+                                                        fontSize = 11.sp,
+                                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                                    )
+                                                    
+                                                    Spacer(Modifier.height(6.dp))
+                                                    
+                                                    // Progress Indicator
+                                                    LinearProgressIndicator(
+                                                        progress = { badge.progress },
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .height(5.dp),
+                                                        color = badge.color,
+                                                        trackColor = if (isUnlocked) badge.color.copy(alpha = 0.15f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
+                                                        strokeCap = StrokeCap.Round
+                                                    )
+                                                    Spacer(Modifier.height(2.dp))
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.SpaceBetween
+                                                    ) {
+                                                        Text(
+                                                            text = "Progress: ${badge.current} / ${badge.target}",
+                                                            fontSize = 9.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                                        )
+                                                        Text(
+                                                            text = "${(badge.progress * 100).toInt()}%",
+                                                            fontSize = 9.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = if (isUnlocked) badge.color else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
