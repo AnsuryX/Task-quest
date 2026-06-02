@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -429,6 +430,12 @@ fun DashboardScreen(
         var targetScore by remember { mutableStateOf("50") }
         var sizeError by remember { mutableStateOf(false) }
 
+        val tasks by viewModel.tasks.collectAsState()
+        val unassociatedTasks = remember(tasks, selectedSector) { 
+            tasks.filter { !it.completed && it.associatedGoalId == null && it.sector == selectedSector } 
+        }
+        var selectedTaskIds by remember { mutableStateOf(setOf<Int>()) }
+
         Dialog(onDismissRequest = { showAddGoalDialog = false }) {
             Card(
                 shape = RoundedCornerShape(16.dp),
@@ -470,7 +477,10 @@ fun DashboardScreen(
                             val isSel = selectedSector == sector
                             FilterChip(
                                 selected = isSel,
-                                onClick = { selectedSector = sector },
+                                onClick = { 
+                                    selectedSector = sector
+                                    selectedTaskIds = emptySet() // Reset selections if sector changes
+                                },
                                 label = { Text(sector, fontSize = 11.sp) },
                                 modifier = Modifier.testTag("sector_chip_$sector")
                             )
@@ -484,10 +494,40 @@ fun DashboardScreen(
                             val isSel = selectedSector == sector
                             FilterChip(
                                 selected = isSel,
-                                onClick = { selectedSector = sector },
+                                onClick = { 
+                                    selectedSector = sector
+                                    selectedTaskIds = emptySet() // Reset selections if sector changes
+                                },
                                 label = { Text(sector, fontSize = 11.sp) },
                                 modifier = Modifier.testTag("sector_chip_$sector")
                             )
+                        }
+                    }
+
+                    // Task association widget inside Add Goal dialog
+                    if (unassociatedTasks.isNotEmpty()) {
+                        Text(
+                            text = "Associate Existing Quests (${selectedSector})",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+                        )
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            this@LazyRow.items(unassociatedTasks) { task ->
+                                val isChosen = selectedTaskIds.contains(task.id)
+                                FilterChip(
+                                    selected = isChosen,
+                                    onClick = {
+                                        selectedTaskIds = if (isChosen) {
+                                            selectedTaskIds - task.id
+                                        } else {
+                                            selectedTaskIds + task.id
+                                        }
+                                    },
+                                    label = { Text(task.title, fontSize = 11.sp) }
+                                )
+                            }
                         }
                     }
 
@@ -520,7 +560,12 @@ fun DashboardScreen(
                             onClick = {
                                 val targetVal = targetScore.toFloatOrNull()
                                 if (goalTitle.isNotBlank() && targetVal != null && targetVal > 0) {
-                                    viewModel.addGoal(goalTitle.trim(), selectedSector, targetVal)
+                                    viewModel.addGoalWithTasks(
+                                        title = goalTitle.trim(), 
+                                        sector = selectedSector, 
+                                        targetValue = targetVal, 
+                                        associatedTaskIds = selectedTaskIds.toList()
+                                    )
                                     showAddGoalDialog = false
                                 } else {
                                     sizeError = true

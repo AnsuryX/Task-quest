@@ -483,7 +483,8 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
         plannedDay: String? = null,
         plannedDate: Long? = null,
         temptationBundle: String = "",
-        commitmentXpStake: Int = 0
+        commitmentXpStake: Int = 0,
+        associatedGoalId: Int? = null
     ) {
         viewModelScope.launch {
             val basexp = when (quadrant) {
@@ -505,7 +506,8 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
                     plannedDate = plannedDate,
                     temptationBundle = temptationBundle,
                     hasCommitmentContract = hasContract,
-                    commitmentXpStake = commitmentXpStake
+                    commitmentXpStake = commitmentXpStake,
+                    associatedGoalId = associatedGoalId
                 )
             )
             if (hasContract) {
@@ -517,6 +519,29 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
                         dueDate = System.currentTimeMillis() + (24 * 60 * 60 * 1000)
                     )
                 )
+            }
+            triggerCompanionNudge()
+        }
+    }
+
+    fun addGoalWithTasks(title: String, sector: String, targetValue: Float, associatedTaskIds: List<Int>) {
+        viewModelScope.launch {
+            val newGoalId = repository.insertGoal(
+                Goal(
+                    title = title,
+                    sector = sector,
+                    targetValue = targetValue,
+                    currentValue = 0f
+                )
+            ).toInt()
+
+            // Update selected tasks
+            val currentTasks = tasks.value
+            for (taskId in associatedTaskIds) {
+                val taskToUpdate = currentTasks.find { it.id == taskId }
+                if (taskToUpdate != null) {
+                    repository.updateTask(taskToUpdate.copy(associatedGoalId = newGoalId))
+                }
             }
             triggerCompanionNudge()
         }

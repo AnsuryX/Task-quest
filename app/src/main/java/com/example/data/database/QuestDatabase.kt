@@ -23,7 +23,7 @@ import com.example.data.model.WeeklyReflection
         CommitmentContract::class,
         WeeklyReflection::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class QuestDatabase : RoomDatabase() {

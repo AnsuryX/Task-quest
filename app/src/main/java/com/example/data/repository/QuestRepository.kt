@@ -111,19 +111,32 @@ class QuestRepository(private val questDao: QuestDao) {
         val leveledStats = handleLevelUp(updatedStats)
         questDao.insertUserStats(leveledStats)
 
-        // Increment related Sector Goals
-        // Standard action: finding active goals in the task's life sector and incrementing.
-        val activeGoals = questDao.getAllGoals().firstOrNull()?.filter { 
-            it.sector.equals(task.sector, ignoreCase = true) && !it.completed 
-        } ?: emptyList()
+        // Increment related Goal: prioritises specific associatedGoalId, falls back to sector
+        if (task.associatedGoalId != null) {
+            val allGoals = questDao.getAllGoals().firstOrNull() ?: emptyList()
+            val linkedGoal = allGoals.find { it.id == task.associatedGoalId }
+            if (linkedGoal != null && !linkedGoal.completed) {
+                val newValue = linkedGoal.currentValue + 15f // specific goal gets +15 points!
+                val isCompleted = newValue >= linkedGoal.targetValue
+                questDao.updateGoal(linkedGoal.copy(
+                    currentValue = if (isCompleted) linkedGoal.targetValue else newValue,
+                    completed = isCompleted
+                ))
+            }
+        } else {
+            // fallback to any active goals in task sector
+            val activeGoals = questDao.getAllGoals().firstOrNull()?.filter { 
+                it.sector.equals(task.sector, ignoreCase = true) && !it.completed 
+            } ?: emptyList()
 
-        for (goal in activeGoals) {
-            val newValue = goal.currentValue + 10f // complete task gives +10 completion progress points to sector goal
-            val isCompleted = newValue >= goal.targetValue
-            questDao.updateGoal(goal.copy(
-                currentValue = if (isCompleted) goal.targetValue else newValue,
-                completed = isCompleted
-            ))
+            for (goal in activeGoals) {
+                val newValue = goal.currentValue + 10f // complete task gives +10 completion progress points to sector goal
+                val isCompleted = newValue >= goal.targetValue
+                questDao.updateGoal(goal.copy(
+                    currentValue = if (isCompleted) goal.targetValue else newValue,
+                    completed = isCompleted
+                ))
+            }
         }
     }
 

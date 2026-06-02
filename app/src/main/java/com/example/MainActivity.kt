@@ -32,6 +32,7 @@ import com.example.data.model.UserStats
 import com.example.ui.screens.DashboardScreen
 import com.example.ui.screens.PomodoroScreen
 import com.example.ui.screens.QuestLogScreen
+import com.example.ui.screens.KanbanScreen
 import com.example.ui.theme.*
 import com.example.ui.viewmodel.QuestViewModel
 import com.example.ui.viewmodel.QuestViewModelFactory
@@ -375,6 +376,13 @@ class MainActivity : ComponentActivity() {
                             NavigationBarItem(
                                 selected = currentNavIndex == 2,
                                 onClick = { currentNavIndex = 2 },
+                                icon = { Icon(Icons.Default.ViewKanban, contentDescription = "Kanban Board") },
+                                label = { Text("Kanban", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                                modifier = Modifier.testTag("nav_kanban")
+                            )
+                            NavigationBarItem(
+                                selected = currentNavIndex == 3,
+                                onClick = { currentNavIndex = 3 },
                                 icon = { Icon(Icons.Default.Timer, contentDescription = "Focus Chamber") },
                                 label = { Text("Focus Chamber", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
                                 modifier = Modifier.testTag("nav_focus")
@@ -404,9 +412,18 @@ class MainActivity : ComponentActivity() {
                             QuestLogScreen(viewModel = viewModel)
                         }
 
-                        // Shift to Focus Pomodoro screen
+                        // Shift to Kanban board Screen
                         AnimatedVisibility(
                             visible = currentNavIndex == 2,
+                            enter = fadeIn(),
+                            exit = fadeOut()
+                        ) {
+                            KanbanScreen(viewModel = viewModel)
+                        }
+
+                        // Shift to Focus Pomodoro screen
+                        AnimatedVisibility(
+                            visible = currentNavIndex == 3,
                             enter = fadeIn(),
                             exit = fadeOut()
                         ) {

@@ -22,7 +22,8 @@ data class Task(
     val plannedDate: Long? = null, // Epoch millisecond (Daily Planner)
     val temptationBundle: String = "", // Temptation Bundling ritual (e.g. "Siing matcha tea")
     val hasCommitmentContract: Boolean = false,
-    val commitmentXpStake: Int = 0
+    val commitmentXpStake: Int = 0,
+    val associatedGoalId: Int? = null
 )
 
 @Entity(tableName = "goals")

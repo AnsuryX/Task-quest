@@ -11,6 +11,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -211,6 +212,7 @@ fun QuestLogScreen(
 
     // Add Task / Quest dialogue containing behavioral enhancers
     if (showAddTaskDialog) {
+        val goals by viewModel.goals.collectAsState()
         var questTitle by remember { mutableStateOf("") }
         var questNotes by remember { mutableStateOf("") }
         var selectedQuadrant by remember { mutableStateOf(2) } // default Q2 strategic growth
@@ -218,6 +220,7 @@ fun QuestLogScreen(
         var plannedDay by remember { mutableStateOf<String?>("Monday") }
         var temptationBundle by remember { mutableStateOf("") }
         var commitmentXpStake by remember { mutableStateOf("0") }
+        var selectedGoalId by remember { mutableStateOf<Int?>(null) }
         var errorState by remember { mutableStateOf(false) }
 
         Dialog(onDismissRequest = { showAddTaskDialog = false }) {
@@ -291,6 +294,45 @@ fun QuestLogScreen(
                                     label = { Text(sec, fontSize = 11.sp) },
                                     modifier = Modifier.testTag("task_sector_chip_$sec")
                                 )
+                            }
+                        }
+                    }
+
+                    // Choose connected Life Goal
+                    item {
+                        Text("Connect with an Active Goal", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        val activeGoals = remember(goals) { goals.filter { !it.completed } }
+                        if (activeGoals.isEmpty()) {
+                            Text(
+                                "No active goals found. (Create one on Dashboard)",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            )
+                        } else {
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                            ) {
+                                this@LazyRow.item {
+                                    FilterChip(
+                                        selected = selectedGoalId == null,
+                                        onClick = { selectedGoalId = null },
+                                        label = { Text("None") }
+                                    )
+                                }
+                                this@LazyRow.items(activeGoals) { goal ->
+                                    val isSel = selectedGoalId == goal.id
+                                    FilterChip(
+                                        selected = isSel,
+                                        onClick = { 
+                                            selectedGoalId = if (isSel) null else goal.id
+                                            if (!isSel) {
+                                                selectedSector = goal.sector
+                                            }
+                                        },
+                                        label = { Text("${goal.title} (${goal.sector})") }
+                                    )
+                                }
                             }
                         }
                     }
@@ -381,7 +423,8 @@ fun QuestLogScreen(
                                             plannedDay = plannedDay,
                                             plannedDate = null,
                                             temptationBundle = temptationBundle.trim(),
-                                            commitmentXpStake = xpToStake
+                                            commitmentXpStake = xpToStake,
+                                            associatedGoalId = selectedGoalId
                                         )
                                         showAddTaskDialog = false
                                     } else {
@@ -408,11 +451,11 @@ fun MatrixGridView(
     onComplete: (Task) -> Unit,
     onDelete: (Task) -> Unit
 ) {
-    val activeTasks = tasks.filter { it.completed == isCompleted }
-    val q1 = activeTasks.filter { it.matrixQuadrant == 1 }
-    val q2 = activeTasks.filter { it.matrixQuadrant == 2 }
-    val q3 = activeTasks.filter { it.matrixQuadrant == 3 }
-    val q4 = activeTasks.filter { it.matrixQuadrant == 4 }
+    val activeTasks = remember(tasks, isCompleted) { tasks.filter { it.completed == isCompleted } }
+    val q1 = remember(activeTasks) { activeTasks.filter { it.matrixQuadrant == 1 } }
+    val q2 = remember(activeTasks) { activeTasks.filter { it.matrixQuadrant == 2 } }
+    val q3 = remember(activeTasks) { activeTasks.filter { it.matrixQuadrant == 3 } }
+    val q4 = remember(activeTasks) { activeTasks.filter { it.matrixQuadrant == 4 } }
 
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -554,8 +597,8 @@ fun TaskListView(
     onComplete: (Task) -> Unit,
     onDelete: (Task) -> Unit
 ) {
-    val activeList = tasks.filter { !it.completed }
-    val completedList = tasks.filter { it.completed }
+    val activeList = remember(tasks) { tasks.filter { !it.completed } }
+    val completedList = remember(tasks) { tasks.filter { it.completed } }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),

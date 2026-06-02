@@ -452,7 +452,7 @@ fun PomodoroScreen(
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            text = if (isTimerRunning) "Pause" else "Commence",
+                            text = if (isTimerRunning) "Pause" else "Start",
                             fontWeight = FontWeight.ExtraBold,
                             style = MaterialTheme.typography.labelLarge,
                             fontSize = 15.sp,
