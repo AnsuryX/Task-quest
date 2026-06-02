@@ -58,8 +58,15 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            // Dark mode state
-            var isDarkTheme by remember { mutableStateOf(true) }
+            val currentThemeMode = viewModel.appThemeMode
+            val systemInDark = androidx.compose.foundation.isSystemInDarkTheme()
+            val isDarkTheme = remember(currentThemeMode, systemInDark) {
+                when (currentThemeMode) {
+                    1 -> false // Great White Mode (Light)
+                    2 -> true  // Cosmic Obsidian (Dark)
+                    else -> systemInDark // Follow System
+                }
+            }
 
             TaskQuestTheme(darkTheme = isDarkTheme) {
                 // Initialize high priority notification channels to ensure sound and alarm vibrate
@@ -250,7 +257,7 @@ class MainActivity : ComponentActivity() {
                                                 modifier = Modifier.padding(end = 4.dp)
                                             )
                                             IconButton(
-                                                onClick = { isDarkTheme = !isDarkTheme },
+                                                onClick = { viewModel.saveThemeSetting(this@MainActivity, if (isDarkTheme) 1 else 2) },
                                                 modifier = Modifier.size(36.dp).testTag("theme_toggle")
                                             ) {
                                                 Icon(

@@ -3,6 +3,8 @@ package com.example.ui.screens
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -25,9 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.data.model.Goal
-import com.example.ui.theme.NeonAmber
-import com.example.ui.theme.NeonCyan
-import com.example.ui.theme.NeonPurple
+import com.example.ui.theme.*
 import com.example.ui.viewmodel.AiReportState
 import com.example.ui.viewmodel.QuestViewModel
 
@@ -37,6 +37,12 @@ fun DashboardScreen(
     viewModel: QuestViewModel,
     modifier: Modifier = Modifier
 ) {
+    val NeonCyan = getDynamicCyan()
+    val NeonPurple = getDynamicPurple()
+    val NeonAmber = getDynamicAmber()
+    val NeonRose = getDynamicRose()
+    val NeonGreen = getDynamicGreen()
+
     val goals by viewModel.goals.collectAsState()
     val stats by viewModel.userStats.collectAsState()
     val aiState by viewModel.aiReportState.collectAsState()
@@ -443,7 +449,9 @@ fun DashboardScreen(
                 modifier = Modifier.padding(16.dp).fillMaxWidth()
             ) {
                 Column(
-                    modifier = Modifier.padding(20.dp),
+                    modifier = Modifier
+                        .padding(20.dp)
+                        .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Text(

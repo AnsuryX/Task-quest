@@ -28,9 +28,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.app.NotificationManagerCompat
 import kotlinx.coroutines.launch
-import com.example.ui.theme.NeonAmber
-import com.example.ui.theme.NeonCyan
-import com.example.ui.theme.NeonPurple
+import com.example.ui.theme.*
 import com.example.ui.viewmodel.QuestViewModel
 import com.example.util.NotificationAndSoundHelper
 
@@ -40,6 +38,12 @@ fun SettingsDialog(
     viewModel: QuestViewModel,
     onDismiss: () -> Unit
 ) {
+    val NeonCyan = getDynamicCyan()
+    val NeonPurple = getDynamicPurple()
+    val NeonAmber = getDynamicAmber()
+    val NeonRose = getDynamicRose()
+    val NeonGreen = getDynamicGreen()
+
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
     val scrollState = rememberScrollState()
@@ -138,13 +142,13 @@ fun SettingsDialog(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Icon(
-                            Icons.Default.VolumeUp,
-                            contentDescription = "Sounds",
+                            Icons.Default.Palette,
+                            contentDescription = "Visage & Chimes",
                             tint = if (activeTab == 0) NeonAmber else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
                             modifier = Modifier.size(20.dp)
                         )
                         Text(
-                            "Audio & Presets",
+                            "Visage & Chimes",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = if (activeTab == 0) NeonAmber else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
@@ -207,6 +211,90 @@ fun SettingsDialog(
                     ) {
                         when (activeTab) {
                             0 -> {
+                                // --- APP VISAGE & LIGHT SYSTEM THEME ---
+                                Text(
+                                    "🎨 KINGDOM VISAGE (THEME SELECTION)",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = NeonCyan,
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+
+                                Card(
+                                    modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                                    ),
+                                    border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
+                                ) {
+                                    Column(modifier = Modifier.padding(14.dp)) {
+                                        Text(
+                                            text = "App Color Scheme Presets",
+                                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Spacer(Modifier.height(4.dp))
+                                        Text(
+                                            text = "Toggle the application theme. Forge high contrast alignments for day and night cycles.",
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                        )
+                                        
+                                        Spacer(Modifier.height(14.dp))
+
+                                        // 3 Theme Modes
+                                        val modesList = listOf(
+                                            Triple(0, "🛡️ Follow System Aegis", "Aligns dynamically with host device's theme settings"),
+                                            Triple(1, "🕊️ Great White Mode", "Pristine, ultra high-contrast light mode for daytime matrix planning"),
+                                            Triple(2, "🌌 Cosmic Obsidian", "Epic twilight universe dark mode to guard your eyes at night")
+                                        )
+
+                                        modesList.forEach { (modeIdx, title, doc) ->
+                                            val isSelected = viewModel.appThemeMode == modeIdx
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .background(
+                                                        if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                                        else Color.Transparent
+                                                    )
+                                                    .clickable {
+                                                        viewModel.saveThemeSetting(context, modeIdx)
+                                                    }
+                                                    .padding(horizontal = 8.dp, vertical = 10.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                RadioButton(
+                                                    selected = isSelected,
+                                                    onClick = {
+                                                        viewModel.saveThemeSetting(context, modeIdx)
+                                                    },
+                                                    colors = RadioButtonDefaults.colors(
+                                                        selectedColor = MaterialTheme.colorScheme.primary
+                                                    )
+                                                )
+                                                Spacer(Modifier.width(8.dp))
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(
+                                                        text = title,
+                                                        fontSize = 13.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                    Text(
+                                                        text = doc,
+                                                        fontSize = 11.sp,
+                                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Spacer(Modifier.height(8.dp))
+
                                 // --- AUDIO & NOTIFICATION SYSTEMS ---
                                 Text(
                                     "🚨 FOCUS SHIELD & EMULATOR PERMISSIONS",

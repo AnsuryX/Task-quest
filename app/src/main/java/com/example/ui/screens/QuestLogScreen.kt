@@ -10,6 +10,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -46,6 +48,12 @@ fun QuestLogScreen(
     viewModel: QuestViewModel,
     modifier: Modifier = Modifier
 ) {
+    val NeonCyan = getDynamicCyan()
+    val NeonPurple = getDynamicPurple()
+    val NeonAmber = getDynamicAmber()
+    val NeonRose = getDynamicRose()
+    val NeonGreen = getDynamicGreen()
+
     val tasks by viewModel.tasks.collectAsState()
     val intentions by viewModel.intentions.collectAsState()
     val contracts by viewModel.commitmentContracts.collectAsState()
@@ -229,213 +237,193 @@ fun QuestLogScreen(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 modifier = Modifier.fillMaxWidth().padding(4.dp)
             ) {
-                LazyColumn(
-                    modifier = Modifier.padding(18.dp),
+                Column(
+                    modifier = Modifier
+                        .padding(18.dp)
+                        .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    item {
-                        Text(
-                            text = "Forge Quest Specs",
-                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                            modifier = Modifier.fillMaxWidth(),
-                            textAlign = TextAlign.Center
-                        )
+                    Text(
+                        text = "Forge Quest Specs",
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
+
+                    OutlinedTextField(
+                        value = questTitle,
+                        onValueChange = { questTitle = it },
+                        label = { Text("Quest Title") },
+                        placeholder = { Text("e.g. Master Room integrations") },
+                        modifier = Modifier.fillMaxWidth().testTag("quest_input_title"),
+                        singleLine = true
+                    )
+
+                    OutlinedTextField(
+                        value = questNotes,
+                        onValueChange = { questNotes = it },
+                        label = { Text("Objectives & Notes (Optional)") },
+                        modifier = Modifier.fillMaxWidth().testTag("quest_input_notes"),
+                        maxLines = 2
+                    )
+
+                    Text("Eisenhower Matrix Category", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        QuadrantSelectionRow(1, "Q1: Urgent & Important", selectedQuadrant == 1, Quadrant1Color) { selectedQuadrant = 1 }
+                        QuadrantSelectionRow(2, "Q2: Important / Growth Hub", selectedQuadrant == 2, Quadrant2Color) { selectedQuadrant = 2 }
+                        QuadrantSelectionRow(3, "Q3: Urgent but Not Important", selectedQuadrant == 3, Quadrant3Color) { selectedQuadrant = 3 }
+                        QuadrantSelectionRow(4, "Q4: Not Urgent & Leisure", selectedQuadrant == 4, Quadrant4Color) { selectedQuadrant = 4 }
                     }
 
-                    item {
-                        OutlinedTextField(
-                            value = questTitle,
-                            onValueChange = { questTitle = it },
-                            label = { Text("Quest Title") },
-                            placeholder = { Text("e.g. Master Room integrations") },
-                            modifier = Modifier.fillMaxWidth().testTag("quest_input_title"),
-                            singleLine = true
-                        )
-                    }
-
-                    item {
-                        OutlinedTextField(
-                            value = questNotes,
-                            onValueChange = { questNotes = it },
-                            label = { Text("Objectives & Notes (Optional)") },
-                            modifier = Modifier.fillMaxWidth().testTag("quest_input_notes"),
-                            maxLines = 2
-                        )
-                    }
-
-                    item {
-                        Text("Eisenhower Matrix Category", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            QuadrantSelectionRow(1, "Q1: Urgent & Important", selectedQuadrant == 1, Quadrant1Color) { selectedQuadrant = 1 }
-                            QuadrantSelectionRow(2, "Q2: Important / Growth Hub", selectedQuadrant == 2, Quadrant2Color) { selectedQuadrant = 2 }
-                            QuadrantSelectionRow(3, "Q3: Urgent but Not Important", selectedQuadrant == 3, Quadrant3Color) { selectedQuadrant = 3 }
-                            QuadrantSelectionRow(4, "Q4: Not Urgent & Leisure", selectedQuadrant == 4, Quadrant4Color) { selectedQuadrant = 4 }
+                    Text("Associated Life Sector Area", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    val sectorsList = listOf("Business", "Health", "Spiritual", "Relationships", "Personal", "Finance")
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        sectorsList.take(3).forEach { sec ->
+                            FilterChip(
+                                selected = selectedSector == sec,
+                                onClick = { selectedSector = sec },
+                                label = { Text(sec, fontSize = 11.sp) },
+                                modifier = Modifier.testTag("task_sector_chip_$sec")
+                            )
                         }
                     }
-
-                    item {
-                        Text("Associated Life Sector Area", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        val sectorsList = listOf("Business", "Health", "Spiritual", "Relationships", "Personal", "Finance")
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            sectorsList.take(3).forEach { sec ->
-                                FilterChip(
-                                    selected = selectedSector == sec,
-                                    onClick = { selectedSector = sec },
-                                    label = { Text(sec, fontSize = 11.sp) },
-                                    modifier = Modifier.testTag("task_sector_chip_$sec")
-                                )
-                            }
-                        }
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            sectorsList.drop(3).forEach { sec ->
-                                FilterChip(
-                                    selected = selectedSector == sec,
-                                    onClick = { selectedSector = sec },
-                                    label = { Text(sec, fontSize = 11.sp) },
-                                    modifier = Modifier.testTag("task_sector_chip_$sec")
-                                )
-                            }
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        sectorsList.drop(3).forEach { sec ->
+                            FilterChip(
+                                selected = selectedSector == sec,
+                                onClick = { selectedSector = sec },
+                                label = { Text(sec, fontSize = 11.sp) },
+                                modifier = Modifier.testTag("task_sector_chip_$sec")
+                            )
                         }
                     }
 
                     // Choose connected Life Goal
-                    item {
-                        Text("Connect with an Active Goal", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        val activeGoals = remember(goals) { goals.filter { !it.completed } }
-                        if (activeGoals.isEmpty()) {
-                            Text(
-                                "No active goals found. (Create one on Dashboard)",
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                            )
-                        } else {
-                            LazyRow(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                            ) {
-                                this@LazyRow.item {
-                                    FilterChip(
-                                        selected = selectedGoalId == null,
-                                        onClick = { selectedGoalId = null },
-                                        label = { Text("None") }
-                                    )
-                                }
-                                this@LazyRow.items(activeGoals) { goal ->
-                                    val isSel = selectedGoalId == goal.id
-                                    FilterChip(
-                                        selected = isSel,
-                                        onClick = { 
-                                            selectedGoalId = if (isSel) null else goal.id
-                                            if (!isSel) {
-                                                selectedSector = goal.sector
-                                            }
-                                        },
-                                        label = { Text("${goal.title} (${goal.sector})") }
-                                    )
-                                }
+                    Text("Connect with an Active Goal", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    val activeGoals = remember(goals) { goals.filter { !it.completed } }
+                    if (activeGoals.isEmpty()) {
+                        Text(
+                            "No active goals found. (Create one on Dashboard)",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                    } else {
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                        ) {
+                            this@LazyRow.item {
+                                FilterChip(
+                                    selected = selectedGoalId == null,
+                                    onClick = { selectedGoalId = null },
+                                    label = { Text("None") }
+                                )
+                            }
+                            this@LazyRow.items(activeGoals) { goal ->
+                                val isSel = selectedGoalId == goal.id
+                                FilterChip(
+                                    selected = isSel,
+                                    onClick = { 
+                                        selectedGoalId = if (isSel) null else goal.id
+                                        if (!isSel) {
+                                            selectedSector = goal.sector
+                                        }
+                                    },
+                                    label = { Text("${goal.title} (${goal.sector})") }
+                                )
                             }
                         }
                     }
 
                     // Behavioral Addition A: Weekly Planner Horizon Assignment
-                    item {
-                        Text("Assign Days (Weekly Horizon Planner)", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        val days = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
-                        Row(
-                            modifier = Modifier.fillMaxWidth(), 
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            days.take(4).forEach { d ->
-                                FilterChip(
-                                    selected = plannedDay == d,
-                                    onClick = { plannedDay = if (plannedDay == d) null else d },
-                                    label = { Text(d.take(3), fontSize = 10.sp) },
-                                    modifier = Modifier.testTag("day_chip_$d")
-                                )
-                            }
+                    Text("Assign Days (Weekly Horizon Planner)", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    val days = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(), 
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        days.take(4).forEach { d ->
+                            FilterChip(
+                                selected = plannedDay == d,
+                                onClick = { plannedDay = if (plannedDay == d) null else d },
+                                label = { Text(d.take(3), fontSize = 10.sp) },
+                                modifier = Modifier.testTag("day_chip_$d")
+                            )
                         }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(), 
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            days.drop(4).forEach { d ->
-                                FilterChip(
-                                    selected = plannedDay == d,
-                                    onClick = { plannedDay = if (plannedDay == d) null else d },
-                                    label = { Text(d.take(3), fontSize = 10.sp) },
-                                    modifier = Modifier.testTag("day_chip_$d")
-                                )
-                            }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(), 
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        days.drop(4).forEach { d ->
+                            FilterChip(
+                                selected = plannedDay == d,
+                                onClick = { plannedDay = if (plannedDay == d) null else d },
+                                label = { Text(d.take(3), fontSize = 10.sp) },
+                                modifier = Modifier.testTag("day_chip_$d")
+                            )
                         }
                     }
 
                     // Behavioral Addition B: Temptation Bundling settings
-                    item {
-                        OutlinedTextField(
-                            value = temptationBundle,
-                            onValueChange = { temptationBundle = it },
-                            label = { Text("Temptation Bundle Reward Ritual") },
-                            placeholder = { Text("e.g. Savor green tea / Listen to cinematic beats") },
-                            modifier = Modifier.fillMaxWidth().testTag("quest_input_temptation"),
-                            singleLine = true
-                        )
-                    }
+                    OutlinedTextField(
+                        value = temptationBundle,
+                        onValueChange = { temptationBundle = it },
+                        label = { Text("Temptation Bundle Reward Ritual") },
+                        placeholder = { Text("e.g. Savor green tea / Listen to cinematic beats") },
+                        modifier = Modifier.fillMaxWidth().testTag("quest_input_temptation"),
+                        singleLine = true
+                    )
 
                     // Behavioral Addition C: Commitment Stakes XP Contracting
-                    item {
-                        OutlinedTextField(
-                            value = commitmentXpStake,
-                            onValueChange = { commitmentXpStake = it },
-                            label = { Text("Staked Character XP (Commitment Contract)") },
-                            placeholder = { Text("Enter XP points e.g. 50") },
-                            modifier = Modifier.fillMaxWidth().testTag("quest_input_xpstake"),
-                            singleLine = true
-                        )
-                    }
+                    OutlinedTextField(
+                        value = commitmentXpStake,
+                        onValueChange = { commitmentXpStake = it },
+                        label = { Text("Staked Character XP (Commitment Contract)") },
+                        placeholder = { Text("Enter XP points e.g. 50") },
+                        modifier = Modifier.fillMaxWidth().testTag("quest_input_xpstake"),
+                        singleLine = true
+                    )
 
                     if (errorState) {
-                        item {
-                            Text("Please enter a valid quest title.", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
-                        }
+                        Text("Please enter a valid quest title.", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
                     }
 
-                    item {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(
+                            onClick = { showAddTaskDialog = false },
+                            modifier = Modifier.testTag("dismiss_quest_dialog")
                         ) {
-                            TextButton(
-                                onClick = { showAddTaskDialog = false },
-                                modifier = Modifier.testTag("dismiss_quest_dialog")
-                            ) {
-                                Text("Cancel")
-                            }
-                            Spacer(Modifier.width(8.dp))
-                            Button(
-                                onClick = {
-                                    if (questTitle.trim().isNotBlank()) {
-                                        val xpToStake = commitmentXpStake.toIntOrNull() ?: 0
-                                        viewModel.addTaskWithBehavioralDetails(
-                                            title = questTitle.trim(),
-                                            notes = questNotes.trim(),
-                                            quadrant = selectedQuadrant,
-                                            sector = selectedSector,
-                                            plannedDay = plannedDay,
-                                            plannedDate = null,
-                                            temptationBundle = temptationBundle.trim(),
-                                            commitmentXpStake = xpToStake,
-                                            associatedGoalId = selectedGoalId
-                                        )
-                                        showAddTaskDialog = false
-                                    } else {
-                                        errorState = true
-                                    }
-                                },
-                                modifier = Modifier.testTag("submit_quest_dialog"),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Text("Enlist Quest")
-                            }
+                            Text("Cancel")
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                if (questTitle.trim().isNotBlank()) {
+                                    val xpToStake = commitmentXpStake.toIntOrNull() ?: 0
+                                    viewModel.addTaskWithBehavioralDetails(
+                                        title = questTitle.trim(),
+                                        notes = questNotes.trim(),
+                                        quadrant = selectedQuadrant,
+                                        sector = selectedSector,
+                                        plannedDay = plannedDay,
+                                        plannedDate = null,
+                                        temptationBundle = temptationBundle.trim(),
+                                        commitmentXpStake = xpToStake,
+                                        associatedGoalId = selectedGoalId
+                                    )
+                                    showAddTaskDialog = false
+                                } else {
+                                    errorState = true
+                                }
+                            },
+                            modifier = Modifier.testTag("submit_quest_dialog"),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Enlist Quest")
                         }
                     }
                 }
@@ -747,7 +735,9 @@ fun HorizonPlannerView(
     var selectedDayFilter by remember { mutableStateOf("Monday") }
     val daysList = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
     
-    val tasksForDay = tasks.filter { !it.completed && it.plannedDay == selectedDayFilter }
+    val tasksForDay = remember(tasks, selectedDayFilter) {
+        tasks.filter { !it.completed && it.plannedDay == selectedDayFilter }
+    }
 
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -863,96 +853,93 @@ fun BehavioralToolsTab(
     var locationStr by remember { mutableStateOf("") }
     var todStr by remember { mutableStateOf("") }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-        contentPadding = PaddingValues(bottom = 90.dp)
+    val scrollState = rememberScrollState()
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+            .padding(bottom = 90.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         // Form Section Info
-        item {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)),
-                border = BorderStroke(1.dp, NeonCyan.copy(alpha = 0.25f)),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Text("Implementation Intentions (If-Then Planner)", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = NeonCyan)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "Forge custom environment associations (e.g. 'IF event occurs, THEN make task execution reflex'). Scientifically proven to decrease task procrastination by 200%.", 
-                        fontSize = 11.sp, 
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                    )
-                }
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)),
+            border = BorderStroke(1.dp, NeonCyan.copy(alpha = 0.25f)),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Text("Implementation Intentions (If-Then Planner)", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = NeonCyan)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Forge custom environment associations (e.g. 'IF event occurs, THEN make task execution reflex'). Scientifically proven to decrease task procrastination by 200%.", 
+                    fontSize = 11.sp, 
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
             }
         }
 
         // Implementation Intention Input Form
-        item {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                modifier = Modifier.fillMaxWidth().border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
-            ) {
-                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Forge If-Then Association Trigger", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            modifier = Modifier.fillMaxWidth().border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
+        ) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Forge If-Then Association Trigger", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                
+                OutlinedTextField(
+                    value = triggerStr,
+                    onValueChange = { triggerStr = it },
+                    placeholder = { Text("IF... (e.g., I step into study room with tea)", fontSize = 12.sp) },
+                    modifier = Modifier.fillMaxWidth().testTag("intention_if_input"),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = actionStr,
+                    onValueChange = { actionStr = it },
+                    placeholder = { Text("THEN... (e.g., I will engage Focus Shield zone on Compose)", fontSize = 12.sp) },
+                    modifier = Modifier.fillMaxWidth().testTag("intention_then_input"),
+                    singleLine = true
+                )
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
-                        value = triggerStr,
-                        onValueChange = { triggerStr = it },
-                        placeholder = { Text("IF... (e.g., I step into study room with tea)", fontSize = 12.sp) },
-                        modifier = Modifier.fillMaxWidth().testTag("intention_if_input"),
+                        value = locationStr,
+                        onValueChange = { locationStr = it },
+                        placeholder = { Text("Location e.g. Desk", fontSize = 11.sp) },
+                        modifier = Modifier.weight(1f),
                         singleLine = true
                     )
                     OutlinedTextField(
-                        value = actionStr,
-                        onValueChange = { actionStr = it },
-                        placeholder = { Text("THEN... (e.g., I will engage Focus Shield zone on Compose)", fontSize = 12.sp) },
-                        modifier = Modifier.fillMaxWidth().testTag("intention_then_input"),
+                        value = todStr,
+                        onValueChange = { todStr = it },
+                        placeholder = { Text("Time e.g. 9:00 AM", fontSize = 11.sp) },
+                        modifier = Modifier.weight(1f),
                         singleLine = true
                     )
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(
-                            value = locationStr,
-                            onValueChange = { locationStr = it },
-                            placeholder = { Text("Location e.g. Desk", fontSize = 11.sp) },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true
-                        )
-                        OutlinedTextField(
-                            value = todStr,
-                            onValueChange = { todStr = it },
-                            placeholder = { Text("Time e.g. 9:00 AM", fontSize = 11.sp) },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true
-                        )
-                    }
+                }
 
-                    Button(
-                        onClick = {
-                            if (triggerStr.isNotBlank() && actionStr.isNotBlank()) {
-                                onAddIntention(triggerStr, actionStr, locationStr, todStr)
-                                triggerStr = ""
-                                actionStr = ""
-                                locationStr = ""
-                                todStr = ""
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = NeonCyan, contentColor = Color.Black),
-                        modifier = Modifier.align(Alignment.End).testTag("save_intention_btn"),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("Add Intention Association", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
+                Button(
+                    onClick = {
+                        if (triggerStr.isNotBlank() && actionStr.isNotBlank()) {
+                            onAddIntention(triggerStr, actionStr, locationStr, todStr)
+                            triggerStr = ""
+                            actionStr = ""
+                            locationStr = ""
+                            todStr = ""
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonCyan, contentColor = Color.Black),
+                    modifier = Modifier.align(Alignment.End).testTag("save_intention_btn"),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Add Intention Association", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
 
         // List Active If-Thens Associations
         if (intentions.isNotEmpty()) {
-            item {
-                Text("Active Habits & Intentions associations", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-            }
-            items(intentions) { intention ->
+            Text("Active Habits & Intentions associations", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            intentions.forEach { intention ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -995,11 +982,9 @@ fun BehavioralToolsTab(
 
         // Commitment Contracts active list
         if (contracts.isNotEmpty()) {
-            item {
-                Spacer(Modifier.height(10.dp))
-                Text("Active Character Commitment Contracts", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-            }
-            items(contracts) { contract ->
+            Spacer(Modifier.height(10.dp))
+            Text("Active Character Commitment Contracts", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            contracts.forEach { contract ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
@@ -1038,123 +1023,120 @@ fun WeeklyReviewTab(
     
     val currentAiState by aiState.collectAsState()
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        contentPadding = PaddingValues(bottom = 90.dp)
+    val scrollState = rememberScrollState()
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+            .padding(bottom = 90.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                modifier = Modifier.fillMaxWidth().border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
-            ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Submit Weekly Progress Chronicle", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = NeonCyan)
-                    
-                    OutlinedTextField(
-                        value = reviewTitle,
-                        onValueChange = { reviewTitle = it },
-                        label = { Text("Week Label / Title") },
-                        modifier = Modifier.fillMaxWidth().testTag("review_title_input"),
-                        singleLine = true
-                    )
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            modifier = Modifier.fillMaxWidth().border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Submit Weekly Progress Chronicle", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = NeonCyan)
+                
+                OutlinedTextField(
+                    value = reviewTitle,
+                    onValueChange = { reviewTitle = it },
+                    label = { Text("Week Label / Title") },
+                    modifier = Modifier.fillMaxWidth().testTag("review_title_input"),
+                    singleLine = true
+                )
 
-                    OutlinedTextField(
-                        value = winsSummary,
-                        onValueChange = { winsSummary = it },
-                        label = { Text("What did you slay this week? (Wins)") },
-                        placeholder = { Text("e.g. Cleared all strategic coding matrices") },
-                        modifier = Modifier.fillMaxWidth().testTag("wins_summary_input"),
-                        maxLines = 3
-                    )
+                OutlinedTextField(
+                    value = winsSummary,
+                    onValueChange = { winsSummary = it },
+                    label = { Text("What did you slay this week? (Wins)") },
+                    placeholder = { Text("e.g. Cleared all strategic coding matrices") },
+                    modifier = Modifier.fillMaxWidth().testTag("wins_summary_input"),
+                    maxLines = 3
+                )
 
-                    OutlinedTextField(
-                        value = lessonsLearned,
-                        onValueChange = { lessonsLearned = it },
-                        label = { Text("Hardships & Lessons (Mistakes)") },
-                        placeholder = { Text("e.g. Procrastinated on morning focus zone segments") },
-                        modifier = Modifier.fillMaxWidth().testTag("lessons_input"),
-                        maxLines = 3
-                    )
+                OutlinedTextField(
+                    value = lessonsLearned,
+                    onValueChange = { lessonsLearned = it },
+                    label = { Text("Hardships & Lessons (Mistakes)") },
+                    placeholder = { Text("e.g. Procrastinated on morning focus zone segments") },
+                    modifier = Modifier.fillMaxWidth().testTag("lessons_input"),
+                    maxLines = 3
+                )
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Stamina Stars Rating", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                            (1..5).forEach { star ->
-                                val active = star <= focusStars
-                                Text(
-                                    text = if (active) "⭐" else "☆",
-                                    fontSize = 18.sp,
-                                    modifier = Modifier.clickable { focusStars = star }
-                                )
-                            }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Stamina Stars Rating", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                        (1..5).forEach { star ->
+                            val active = star <= focusStars
+                            Text(
+                                text = if (active) "⭐" else "☆",
+                                fontSize = 18.sp,
+                                modifier = Modifier.clickable { focusStars = star }
+                            )
                         }
                     }
+                }
 
-                    Button(
-                        onClick = {
-                            if (winsSummary.isNotBlank() && reviewTitle.isNotBlank()) {
-                                onSubmitReview(reviewTitle, winsSummary, lessonsLearned, focusStars)
-                                winsSummary = ""
-                                lessonsLearned = ""
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = NeonPurple, contentColor = Color.Black),
-                        modifier = Modifier.fillMaxWidth().testTag("submit_weekly_review_btn"),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Text("Consult Chronos for End-of-Week reflection", fontWeight = FontWeight.Bold)
-                    }
+                Button(
+                    onClick = {
+                        if (winsSummary.isNotBlank() && reviewTitle.isNotBlank()) {
+                            onSubmitReview(reviewTitle, winsSummary, lessonsLearned, focusStars)
+                            winsSummary = ""
+                            lessonsLearned = ""
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonPurple, contentColor = Color.Black),
+                    modifier = Modifier.fillMaxWidth().testTag("submit_weekly_review_btn"),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("Consult Chronos for End-of-Week reflection", fontWeight = FontWeight.Bold)
                 }
             }
         }
 
         // Live Consulting review loading states
-        item {
-            AnimatedVisibility(visible = currentAiState !is AiReportState.Idle) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
-                        .padding(12.dp)
-                ) {
-                    when (val state = currentAiState) {
-                        is AiReportState.Loading -> {
-                            Column(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                CircularProgressIndicator(color = NeonCyan)
-                                Spacer(Modifier.height(10.dp))
-                                Text("🦉 Chronos reviewing week... formulating tactical feedback...")
-                            }
+        AnimatedVisibility(visible = currentAiState !is AiReportState.Idle) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                    .padding(12.dp)
+            ) {
+                when (val state = currentAiState) {
+                    is AiReportState.Loading -> {
+                        Column(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator(color = NeonCyan)
+                            Spacer(Modifier.height(10.dp))
+                            Text("🦉 Chronos reviewing week... formulating tactical feedback...")
                         }
-                        is AiReportState.Success -> {
-                            Column {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("🦉 ", fontSize = 24.sp)
-                                    Text("CHRONOS RANGER ADVISORY VERDICT:", fontWeight = FontWeight.Bold, color = NeonCyan, fontSize = 13.sp)
-                                }
-                                Spacer(Modifier.height(8.dp))
-                                MarkdownCard(state.reportMarkdown)
-                            }
-                        }
-                        is AiReportState.Error -> {
-                            Text("Connection issue consulting Chronos AI: ${state.message}", color = Color.Red, fontSize = 12.sp)
-                        }
-                        else -> {}
                     }
+                    is AiReportState.Success -> {
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("🦉 ", fontSize = 24.sp)
+                                Text("CHRONOS RANGER ADVISORY VERDICT:", fontWeight = FontWeight.Bold, color = NeonCyan, fontSize = 13.sp)
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            MarkdownCard(state.reportMarkdown)
+                        }
+                    }
+                    is AiReportState.Error -> {
+                        Text("Connection issue consulting Chronos AI: ${state.message}", color = Color.Red, fontSize = 12.sp)
+                    }
+                    else -> {}
                 }
             }
         }
 
         // History reflections
         if (reflections.isNotEmpty()) {
-            item {
-                Text("Previous Weekly Chronicle Reflections", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = NeonCyan)
-            }
-            items(reflections) { reflection ->
+            Text("Previous Weekly Chronicle Reflections", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = NeonCyan)
+            reflections.forEach { reflection ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)

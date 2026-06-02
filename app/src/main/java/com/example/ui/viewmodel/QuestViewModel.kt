@@ -72,6 +72,7 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
     // --- Customizable Sound Options & Cloud Account Sync States ---
     var workSoundThemeSetting by mutableStateOf(0) // 0 = Arcade, 1 = Classic, 2 = Zen, 3 = Cosmic
     var breakSoundThemeSetting by mutableStateOf(0) // 0 = Arcade, 1 = Classic, 2 = Zen, 3 = Cosmic
+    var appThemeMode by mutableStateOf(0) // 0 = Follow System, 1 = Great White, 2 = Cosmic Obsidian
 
     var cloudUserEmail by mutableStateOf("")
     var cloudUserNickname by mutableStateOf("")
@@ -83,9 +84,18 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
         val prefs = context.getSharedPreferences("quest_settings", android.content.Context.MODE_PRIVATE)
         workSoundThemeSetting = prefs.getInt("work_sound_setting", 0)
         breakSoundThemeSetting = prefs.getInt("break_sound_setting", 0)
+        appThemeMode = prefs.getInt("app_theme_mode", 0)
         cloudUserEmail = prefs.getString("cloud_user_email", "") ?: ""
         cloudUserNickname = prefs.getString("cloud_user_nickname", "") ?: ""
         isLoggedIn = prefs.getBoolean("is_logged_in", false)
+    }
+
+    fun saveThemeSetting(context: android.content.Context, modeIndex: Int) {
+        appThemeMode = modeIndex
+        val prefs = context.getSharedPreferences("quest_settings", android.content.Context.MODE_PRIVATE)
+        prefs.edit()
+            .putInt("app_theme_mode", modeIndex)
+            .apply()
     }
 
     fun saveSoundSettings(context: android.content.Context, workIndex: Int, breakIndex: Int) {

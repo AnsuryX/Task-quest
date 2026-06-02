@@ -38,6 +38,12 @@ fun KanbanScreen(
     viewModel: QuestViewModel,
     modifier: Modifier = Modifier
 ) {
+    val NeonCyan = getDynamicCyan()
+    val NeonPurple = getDynamicPurple()
+    val NeonAmber = getDynamicAmber()
+    val NeonRose = getDynamicRose()
+    val NeonGreen = getDynamicGreen()
+
     val tasks by viewModel.tasks.collectAsState()
     val goals by viewModel.goals.collectAsState()
 

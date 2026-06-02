@@ -31,9 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
 import com.example.data.model.Task
-import com.example.ui.theme.NeonAmber
-import com.example.ui.theme.NeonCyan
-import com.example.ui.theme.NeonPurple
+import com.example.ui.theme.*
 import com.example.ui.viewmodel.QuestViewModel
 import com.example.util.NotificationAndSoundHelper
 
@@ -43,6 +41,12 @@ fun PomodoroScreen(
     viewModel: QuestViewModel,
     modifier: Modifier = Modifier
 ) {
+    val NeonCyan = getDynamicCyan()
+    val NeonPurple = getDynamicPurple()
+    val NeonAmber = getDynamicAmber()
+    val NeonRose = getDynamicRose()
+    val NeonGreen = getDynamicGreen()
+
     val tasks by viewModel.tasks.collectAsState()
     val isTimerRunning = viewModel.isTimerRunning
     val countDownSeconds = viewModel.countDownSeconds

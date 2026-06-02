@@ -48,3 +48,19 @@ fun TaskQuestTheme(
         content = content
     )
 }
+
+@Composable
+fun getDynamicCyan(): Color = if (MaterialTheme.colorScheme.primary == NeonPurple) NeonCyan else LightSecondary
+
+@Composable
+fun getDynamicPurple(): Color = if (MaterialTheme.colorScheme.primary == NeonPurple) NeonPurple else LightPrimary
+
+@Composable
+fun getDynamicAmber(): Color = if (MaterialTheme.colorScheme.primary == NeonPurple) NeonAmber else LightAmber
+
+@Composable
+fun getDynamicGreen(): Color = if (MaterialTheme.colorScheme.primary == NeonPurple) NeonGreen else LightGreen
+
+@Composable
+fun getDynamicRose(): Color = if (MaterialTheme.colorScheme.primary == NeonPurple) NeonRose else LightRose
+
