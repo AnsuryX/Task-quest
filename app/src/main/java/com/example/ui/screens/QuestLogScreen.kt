@@ -230,6 +230,9 @@ fun QuestLogScreen(
         var commitmentXpStake by remember { mutableStateOf("0") }
         var selectedGoalId by remember { mutableStateOf<Int?>(null) }
         var errorState by remember { mutableStateOf(false) }
+        var accountabilityPartner by remember { mutableStateOf("") }
+        var consequenceDesc by remember { mutableStateOf("") }
+        var selectedDuePreset by remember { mutableStateOf("None") }
 
         Dialog(onDismissRequest = { showAddTaskDialog = false }) {
             Card(
@@ -385,6 +388,42 @@ fun QuestLogScreen(
                         singleLine = true
                     )
 
+                    // Accountability settings
+                    OutlinedTextField(
+                        value = accountabilityPartner,
+                        onValueChange = { accountabilityPartner = it },
+                        label = { Text("Accountability Guardian Name / RPG Mentor") },
+                        placeholder = { Text("e.g. Guild Commander, AI Chronos, Jane") },
+                        modifier = Modifier.fillMaxWidth().testTag("quest_input_accountability"),
+                        singleLine = true
+                    )
+
+                    OutlinedTextField(
+                        value = consequenceDesc,
+                        onValueChange = { consequenceDesc = it },
+                        label = { Text("Consequence of Default / Failure") },
+                        placeholder = { Text("e.g. Deduct 40 XP / Donate $5 to Charity") },
+                        modifier = Modifier.fillMaxWidth().testTag("quest_input_consequence"),
+                        singleLine = true
+                    )
+
+                    Text("Due Date (Target Limit) 📅", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        val duePresets = listOf("None", "1 Day", "3 Days", "1 Week", "2 Weeks")
+                        duePresets.forEach { preset ->
+                            val isSel = selectedDuePreset == preset
+                            FilterChip(
+                                selected = isSel,
+                                onClick = { selectedDuePreset = preset },
+                                label = { Text(preset, fontSize = 11.sp) },
+                                modifier = Modifier.testTag("due_preset_$preset")
+                            )
+                        }
+                    }
+
                     if (errorState) {
                         Text("Please enter a valid quest title.", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
                     }
@@ -404,6 +443,13 @@ fun QuestLogScreen(
                             onClick = {
                                 if (questTitle.trim().isNotBlank()) {
                                     val xpToStake = commitmentXpStake.toIntOrNull() ?: 0
+                                    val targetDueDate = when (selectedDuePreset) {
+                                        "1 Day" -> System.currentTimeMillis() + (24 * 60 * 60 * 1000L)
+                                        "3 Days" -> System.currentTimeMillis() + (3 * 24 * 60 * 60 * 1000L)
+                                        "1 Week" -> System.currentTimeMillis() + (7 * 24 * 60 * 60 * 1000L)
+                                        "2 Weeks" -> System.currentTimeMillis() + (14 * 24 * 60 * 60 * 1000L)
+                                        else -> null
+                                    }
                                     viewModel.addTaskWithBehavioralDetails(
                                         title = questTitle.trim(),
                                         notes = questNotes.trim(),
@@ -413,7 +459,10 @@ fun QuestLogScreen(
                                         plannedDate = null,
                                         temptationBundle = temptationBundle.trim(),
                                         commitmentXpStake = xpToStake,
-                                        associatedGoalId = selectedGoalId
+                                        associatedGoalId = selectedGoalId,
+                                        dueDate = targetDueDate,
+                                        accountabilityPartner = accountabilityPartner.trim(),
+                                        consequenceDesc = consequenceDesc.trim()
                                     )
                                     showAddTaskDialog = false
                                 } else {
@@ -691,8 +740,46 @@ fun ExpandedTaskRow(
                     if (task.plannedDay != null) {
                         SuggestionChip(
                             onClick = {},
-                            label = { Text("📅 ${task.plannedDay}", fontSize = 10.sp) },
+                            label = { Text("📅 Planner: ${task.plannedDay}", fontSize = 10.sp) },
                             colors = SuggestionChipDefaults.suggestionChipColors(labelColor = NeonCyan)
+                        )
+                    }
+
+                    if (task.dueDate != null) {
+                        val diffMs = task.dueDate - System.currentTimeMillis()
+                        val daysLeft = (diffMs / (1000.0 * 60.0 * 60.0 * 24.0)).toInt()
+                        val chipText = when {
+                            task.completed -> "Due: Completed"
+                            daysLeft < 0 -> "OVERDUE ⚠️"
+                            daysLeft == 0 -> "Due Today ⏳"
+                            else -> "Due: In $daysLeft d 🕒"
+                        }
+                        val chipColor = when {
+                            task.completed -> NeonGreen
+                            daysLeft < 0 -> MaterialTheme.colorScheme.error
+                            daysLeft == 0 -> NeonAmber
+                            else -> NeonCyan
+                        }
+                        SuggestionChip(
+                            onClick = {},
+                            label = { Text(chipText, fontSize = 10.sp, fontWeight = FontWeight.Bold) },
+                            colors = SuggestionChipDefaults.suggestionChipColors(labelColor = chipColor)
+                        )
+                    }
+
+                    if (task.accountabilityPartner.isNotEmpty()) {
+                        SuggestionChip(
+                            onClick = {},
+                            label = { Text("🛡️ Guardian: ${task.accountabilityPartner}", fontSize = 10.sp) },
+                            colors = SuggestionChipDefaults.suggestionChipColors(labelColor = NeonAmber)
+                        )
+                    }
+
+                    if (task.consequenceDesc.isNotEmpty() && !task.completed) {
+                        SuggestionChip(
+                            onClick = {},
+                            label = { Text("⚠️ Penalty: ${task.consequenceDesc}", fontSize = 10.sp) },
+                            colors = SuggestionChipDefaults.suggestionChipColors(labelColor = MaterialTheme.colorScheme.error)
                         )
                     }
                 }

@@ -23,7 +23,10 @@ data class Task(
     val temptationBundle: String = "", // Temptation Bundling ritual (e.g. "Siing matcha tea")
     val hasCommitmentContract: Boolean = false,
     val commitmentXpStake: Int = 0,
-    val associatedGoalId: Int? = null
+    val associatedGoalId: Int? = null,
+    val dueDate: Long? = null,
+    val accountabilityPartner: String = "",
+    val consequenceDesc: String = ""
 )
 
 @Entity(tableName = "goals")
@@ -34,7 +37,9 @@ data class Goal(
     val targetValue: Float = 100f, // target completion or focus minutes
     val currentValue: Float = 0f,
     val dueDate: Long = System.currentTimeMillis() + (7 * 24 * 60 * 60 * 1000), // default 1 week
-    val completed: Boolean = false
+    val completed: Boolean = false,
+    val accountabilityPartner: String = "",
+    val consequenceDesc: String = ""
 )
 
 @Entity(tableName = "pomodoro_sessions")

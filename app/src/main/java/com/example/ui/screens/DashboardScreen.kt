@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -225,6 +226,10 @@ fun DashboardScreen(
             val aiLoading = viewModel.aiCoPilotLoading
             var copilotMessage by remember { mutableStateOf("") }
 
+            val context = LocalContext.current
+            var showTrainingPane by remember { mutableStateOf(false) }
+            var trainingPromptInput by remember { mutableStateOf(viewModel.chronosTrainingDirectives) }
+
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
@@ -277,6 +282,152 @@ fun DashboardScreen(
                             singleLine = true,
                             enabled = !aiLoading
                         )
+                        Spacer(Modifier.height(8.dp))
+
+                        // Training Terminal subsection
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, NeonAmber.copy(alpha = 0.2f))
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().clickable { showTrainingPane = !showTrainingPane },
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text("🎓", fontSize = 15.sp)
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(
+                                            text = "Train Chronos AI Persona",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = NeonAmber
+                                        )
+                                        if (viewModel.chronosTrainingDirectives.isNotBlank()) {
+                                            Spacer(Modifier.width(6.dp))
+                                            Text(
+                                                text = "(Trained ✓)",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = NeonGreen
+                                            )
+                                        }
+                                    }
+                                    Icon(
+                                        imageVector = if (showTrainingPane) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                        contentDescription = "Toggle Training Pane",
+                                        tint = NeonAmber,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+
+                                if (showTrainingPane) {
+                                    Spacer(Modifier.height(8.dp))
+                                    Text(
+                                        text = "Guide Chronos's focus, tone, and rpg mentoring styling below. Tap a training preset to instantly prime your mentor:",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                                        modifier = Modifier.padding(bottom = 6.dp)
+                                    )
+
+                                    // Training Presets Chips
+                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        val presets = listOf(
+                                            Triple("🧙 Library Sage", "Maintain the tone of a strict medieval librarian. Prioritize academic, reading, and knowledge goals.", NeonPurple),
+                                            Triple("⚔️ Gladiator", "Aggressive, high-energy military colosseum coach. Prioritize fitness, athletic drills, and diet.", Color(0xFFFF2B6D)),
+                                            Triple("🧠 Tech Architect", "Robotic, highly structured engineer. Prioritize codebase building, specifications, and architecture.", NeonCyan),
+                                            Triple("🛡️ Zen Priest", "Calm mountain monk. Prioritize mental peace, slow breathing, meditation, and recovery.", NeonAmber)
+                                        )
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            presets.take(2).forEach { (label, directive, color) ->
+                                                FilterChip(
+                                                    selected = trainingPromptInput == directive,
+                                                    onClick = { trainingPromptInput = directive },
+                                                    label = { Text(label, fontSize = 10.sp) },
+                                                    colors = FilterChipDefaults.filterChipColors(
+                                                        selectedContainerColor = color.copy(alpha = 0.2f),
+                                                        selectedLabelColor = color
+                                                    ),
+                                                    modifier = Modifier.testTag("training_preset_${label.replace(" ", "_").lowercase()}")
+                                                )
+                                            }
+                                        }
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            presets.drop(2).forEach { (label, directive, color) ->
+                                                FilterChip(
+                                                    selected = trainingPromptInput == directive,
+                                                    onClick = { trainingPromptInput = directive },
+                                                    label = { Text(label, fontSize = 10.sp) },
+                                                    colors = FilterChipDefaults.filterChipColors(
+                                                        selectedContainerColor = color.copy(alpha = 0.2f),
+                                                        selectedLabelColor = color
+                                                    ),
+                                                    modifier = Modifier.testTag("training_preset_${label.replace(" ", "_").lowercase()}")
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(Modifier.height(8.dp))
+
+                                    OutlinedTextField(
+                                        value = trainingPromptInput,
+                                        onValueChange = { trainingPromptInput = it },
+                                        placeholder = { Text("Enter mental tuning instructions for Chronos...", fontSize = 12.sp) },
+                                        modifier = Modifier.fillMaxWidth().testTag("chronos_training_field"),
+                                        maxLines = 3,
+                                        textStyle = MaterialTheme.typography.bodySmall,
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = NeonAmber,
+                                            unfocusedBorderColor = NeonAmber.copy(alpha = 0.4f)
+                                        )
+                                    )
+
+                                    Spacer(Modifier.height(6.dp))
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        TextButton(
+                                            onClick = {
+                                                trainingPromptInput = ""
+                                                viewModel.saveChronosTrainingDirectives(context, "")
+                                                android.widget.Toast.makeText(context, "Chronos alignment cleared to baseline configuration.", android.widget.Toast.LENGTH_SHORT).show()
+                                            },
+                                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                                        ) {
+                                            Text("Clear Directives", fontSize = 11.sp)
+                                        }
+
+                                        Button(
+                                            onClick = {
+                                                viewModel.saveChronosTrainingDirectives(context, trainingPromptInput)
+                                                android.widget.Toast.makeText(context, "Chronos primed! Personality metrics aligned successfully.", android.widget.Toast.LENGTH_SHORT).show()
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = NeonAmber, contentColor = Color.Black),
+                                            shape = RoundedCornerShape(6.dp)
+                                        ) {
+                                            Icon(Icons.Default.Upload, contentDescription = "Sync Persona", modifier = Modifier.size(12.dp))
+                                            Spacer(Modifier.width(4.dp))
+                                            Text("Train Mentor", fontSize = 11.sp)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         Spacer(Modifier.height(8.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -421,6 +572,53 @@ fun DashboardScreen(
                                             fontWeight = FontWeight.Bold,
                                             color = sectorColor
                                         )
+                                    }
+
+                                    // Goal Due Target, Guardian & Consequences Indicators
+                                    val goalDaysLeft = run {
+                                        val diffMs = goal.dueDate - System.currentTimeMillis()
+                                        (diffMs / (1000.0 * 60.0 * 60.0 * 24.0)).toInt()
+                                    }
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        val goalDueColor = when {
+                                            goal.completed -> NeonGreen
+                                            goalDaysLeft < 0 -> MaterialTheme.colorScheme.error
+                                            goalDaysLeft == 0 -> NeonAmber
+                                            else -> NeonCyan
+                                        }
+                                        val goalDueTxt = when {
+                                            goal.completed -> "Epic Completed ✓"
+                                            goalDaysLeft < 0 -> "OVERDUE ⚠️"
+                                            goalDaysLeft == 0 -> "Due Today ⏳"
+                                            else -> "Due: In $goalDaysLeft d 📅"
+                                        }
+                                        Text(
+                                            text = goalDueTxt,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = goalDueColor
+                                        )
+
+                                        if (goal.accountabilityPartner.isNotEmpty()) {
+                                            Text(
+                                                text = "• 🛡️ Partner: ${goal.accountabilityPartner}",
+                                                fontSize = 10.sp,
+                                                color = NeonAmber,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
+
+                                        if (goal.consequenceDesc.isNotEmpty() && !goal.completed) {
+                                            Text(
+                                                text = "• Consequence: ${goal.consequenceDesc}",
+                                                fontSize = 10.sp,
+                                                color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
+                                            )
+                                        }
                                     }
                                 }
                                 Box(modifier = Modifier.padding(start = 12.dp)) {
@@ -804,6 +1002,9 @@ fun DashboardScreen(
         var selectedSector by remember { mutableStateOf("Business") }
         var targetScore by remember { mutableStateOf("50") }
         var sizeError by remember { mutableStateOf(false) }
+        var accountabilityPartner by remember { mutableStateOf("") }
+        var consequenceDesc by remember { mutableStateOf("") }
+        var selectedDuePreset by remember { mutableStateOf("1 Week") }
 
         val tasks by viewModel.tasks.collectAsState()
         val unassociatedTasks = remember(tasks, selectedSector) { 
@@ -917,6 +1118,42 @@ fun DashboardScreen(
                         singleLine = true
                     )
 
+                    // Accountability & Due presets
+                    OutlinedTextField(
+                        value = accountabilityPartner,
+                        onValueChange = { accountabilityPartner = it },
+                        label = { Text("Accountability Guardian Name / RPG Mentor") },
+                        placeholder = { Text("e.g. Shield Advisor, Jane") },
+                        modifier = Modifier.fillMaxWidth().testTag("goal_input_accountability"),
+                        singleLine = true
+                    )
+
+                    OutlinedTextField(
+                        value = consequenceDesc,
+                        onValueChange = { consequenceDesc = it },
+                        label = { Text("Consequence of Default / Failure") },
+                        placeholder = { Text("e.g. Lose 100 XP, penalty of delay") },
+                        modifier = Modifier.fillMaxWidth().testTag("goal_input_consequence"),
+                        singleLine = true
+                    )
+
+                    Text("Goal Due Target 📅", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        val duePresets = listOf("3 Days", "1 Week", "2 Weeks", "1 Month")
+                        duePresets.forEach { preset ->
+                            val isSel = selectedDuePreset == preset
+                            FilterChip(
+                                selected = isSel,
+                                onClick = { selectedDuePreset = preset },
+                                label = { Text(preset, fontSize = 11.sp) },
+                                modifier = Modifier.testTag("goal_due_preset_$preset")
+                            )
+                        }
+                    }
+
                     if (sizeError) {
                         Text("Please enter a valid title and target amount.", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
                     }
@@ -937,11 +1174,21 @@ fun DashboardScreen(
                             onClick = {
                                 val targetVal = targetScore.toFloatOrNull()
                                 if (goalTitle.isNotBlank() && targetVal != null && targetVal > 0) {
+                                    val targetDueDate = when (selectedDuePreset) {
+                                        "3 Days" -> System.currentTimeMillis() + (3 * 24 * 60 * 60 * 1000L)
+                                        "1 Week" -> System.currentTimeMillis() + (7 * 24 * 60 * 60 * 1000L)
+                                        "2 Weeks" -> System.currentTimeMillis() + (14 * 24 * 60 * 60 * 1000L)
+                                        "1 Month" -> System.currentTimeMillis() + (30L * 24 * 60 * 60 * 1000L)
+                                        else -> System.currentTimeMillis() + (7 * 24 * 60 * 60 * 1000L)
+                                    }
                                     viewModel.addGoalWithTasks(
                                         title = goalTitle.trim(), 
                                         sector = selectedSector, 
                                         targetValue = targetVal, 
-                                        associatedTaskIds = selectedTaskIds.toList()
+                                        associatedTaskIds = selectedTaskIds.toList(),
+                                        dueDate = targetDueDate,
+                                        accountabilityPartner = accountabilityPartner.trim(),
+                                        consequenceDesc = consequenceDesc.trim()
                                     )
                                     showAddGoalDialog = false
                                 } else {

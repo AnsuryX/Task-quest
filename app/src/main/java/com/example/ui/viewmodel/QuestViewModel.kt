@@ -79,15 +79,30 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
     var isLoggedIn by mutableStateOf(false)
     var syncLogs by mutableStateOf("No synchronization performed in this session. Cloud vault ready.")
     var isSyncInProgress by mutableStateOf(false)
+    var chronosTrainingDirectives by mutableStateOf("")
+
+    private var appContext: android.content.Context? = null
 
     fun loadPreferences(context: android.content.Context) {
-        val prefs = context.getSharedPreferences("quest_settings", android.content.Context.MODE_PRIVATE)
+        val applicationContext = context.applicationContext
+        appContext = applicationContext
+        val prefs = applicationContext.getSharedPreferences("quest_settings", android.content.Context.MODE_PRIVATE)
         workSoundThemeSetting = prefs.getInt("work_sound_setting", 0)
         breakSoundThemeSetting = prefs.getInt("break_sound_setting", 0)
         appThemeMode = prefs.getInt("app_theme_mode", 0)
         cloudUserEmail = prefs.getString("cloud_user_email", "") ?: ""
         cloudUserNickname = prefs.getString("cloud_user_nickname", "") ?: ""
         isLoggedIn = prefs.getBoolean("is_logged_in", false)
+        chronosTrainingDirectives = prefs.getString("chronos_training_directives", "") ?: ""
+        reconcileTimerState(applicationContext)
+    }
+
+    fun saveChronosTrainingDirectives(context: android.content.Context, directives: String) {
+        chronosTrainingDirectives = directives
+        val prefs = context.getSharedPreferences("quest_settings", android.content.Context.MODE_PRIVATE)
+        prefs.edit()
+            .putString("chronos_training_directives", directives)
+            .apply()
     }
 
     fun saveThemeSetting(context: android.content.Context, modeIndex: Int) {
@@ -266,6 +281,159 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
         }
     }
 
+    // --- State persistence helpers ---
+    private fun saveTimerPreferences() {
+        val context = appContext ?: return
+        val prefs = context.getSharedPreferences("quest_settings", android.content.Context.MODE_PRIVATE)
+        val targetEndTime = System.currentTimeMillis() + (countDownSeconds * 1000L)
+        prefs.edit().apply {
+            putBoolean("timer_is_running", isTimerRunning)
+            putString("timer_mode", pomodoroMode)
+            putLong("timer_target_end_time", targetEndTime)
+            putInt("timer_remaining_seconds", countDownSeconds)
+            putInt("timer_selected_task_id", selectedTaskId ?: -1)
+            putBoolean("timer_shield_enabled", isFocusZoneEnabled)
+            apply()
+        }
+    }
+
+    private fun setSystemAlarm(targetEndTimeMs: Long, mode: String) {
+        val context = appContext ?: return
+        val alarmManager = context.getSystemService(android.content.Context.ALARM_SERVICE) as? android.app.AlarmManager ?: return
+        val intent = android.content.Intent(context, com.example.util.TimerAlarmReceiver::class.java).apply {
+            putExtra("mode", mode)
+            putExtra("work_sound_setting", workSoundThemeSetting)
+            putExtra("break_sound_setting", breakSoundThemeSetting)
+        }
+        val pendingIntent = android.app.PendingIntent.getBroadcast(
+            context,
+            9999,
+            intent,
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                alarmManager.setAndAllowWhileIdle(
+                    android.app.AlarmManager.RTC_WAKEUP,
+                    targetEndTimeMs,
+                    pendingIntent
+                )
+            } else {
+                alarmManager.set(
+                    android.app.AlarmManager.RTC_WAKEUP,
+                    targetEndTimeMs,
+                    pendingIntent
+                )
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun cancelSystemAlarm() {
+        val context = appContext ?: return
+        val alarmManager = context.getSystemService(android.content.Context.ALARM_SERVICE) as? android.app.AlarmManager ?: return
+        val intent = android.content.Intent(context, com.example.util.TimerAlarmReceiver::class.java)
+        val pendingIntent = android.app.PendingIntent.getBroadcast(
+            context,
+            9999,
+            intent,
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+        try {
+            alarmManager.cancel(pendingIntent)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun onTimerFinishedAway(context: android.content.Context, savedMode: String) {
+        viewModelScope.launch {
+            val duration = when (savedMode) {
+                "work" -> 25
+                "short_break" -> 5
+                "long_break" -> 15
+                else -> 25
+            }
+            
+            repository.insertPomodoroSession(
+                PomodoroSession(
+                    durationMinutes = duration,
+                    type = savedMode,
+                    associatedTaskId = if (savedMode == "work") selectedTaskId else null,
+                    isFocusZone = (savedMode == "work" && isFocusZoneEnabled)
+                )
+            )
+
+            val nextMode = if (savedMode == "work") "short_break" else "work"
+            pomodoroMode = nextMode
+            countDownSeconds = when (nextMode) {
+                "work" -> 25 * 60
+                "short_break" -> 5 * 60
+                "long_break" -> 15 * 60
+                else -> 25 * 60
+            }
+            saveTimerPreferences()
+            triggerCompanionNudge()
+        }
+    }
+
+    private fun reconcileTimerState(context: android.content.Context) {
+        val prefs = context.getSharedPreferences("quest_settings", android.content.Context.MODE_PRIVATE)
+        val savedIsRunning = prefs.getBoolean("timer_is_running", false)
+        val savedMode = prefs.getString("timer_mode", "work") ?: "work"
+        val targetEndTime = prefs.getLong("timer_target_end_time", 0L)
+        val remainingAtPause = prefs.getInt("timer_remaining_seconds", 1500)
+        val selectedTask = prefs.getInt("timer_selected_task_id", -1)
+        val shieldEnabled = prefs.getBoolean("timer_shield_enabled", false)
+
+        pomodoroMode = savedMode
+        selectedTaskId = if (selectedTask != -1) selectedTask else null
+        isFocusZoneEnabled = shieldEnabled
+
+        if (savedIsRunning) {
+            val now = System.currentTimeMillis()
+            val remaining = ((targetEndTime - now) / 1000).toInt()
+            if (remaining > 0) {
+                isTimerRunning = true
+                countDownSeconds = remaining
+                isSuppressionActive = shieldEnabled && savedMode == "work"
+                startBackgroundTimerJob()
+            } else {
+                isTimerRunning = false
+                isSuppressionActive = false
+                countDownSeconds = when (savedMode) {
+                    "work" -> 25 * 60
+                    "short_break" -> 5 * 60
+                    "long_break" -> 15 * 60
+                    else -> 25 * 60
+                }
+                onTimerFinishedAway(context, savedMode)
+            }
+        } else {
+            isTimerRunning = false
+            isSuppressionActive = false
+            countDownSeconds = remainingAtPause
+        }
+    }
+
+    private fun startBackgroundTimerJob() {
+        timerJob?.cancel()
+        timerJob = viewModelScope.launch {
+            while (countDownSeconds > 0 && isTimerRunning) {
+                delay(1000)
+                countDownSeconds -= 1
+                appContext?.let { ctx ->
+                    val prefs = ctx.getSharedPreferences("quest_settings", android.content.Context.MODE_PRIVATE)
+                    prefs.edit().putInt("timer_remaining_seconds", countDownSeconds).apply()
+                }
+            }
+            if (countDownSeconds == 0) {
+                onTimerFinished()
+            }
+        }
+    }
+
     // --- Pomodoro Ticker Logic ---
     fun toggleTimer() {
         if (isTimerRunning) {
@@ -273,6 +441,7 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
         } else {
             startTimer()
         }
+        saveTimerPreferences()
     }
 
     private fun startTimer() {
@@ -284,24 +453,24 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
         viewModelScope.launch {
             _uiEvents.emit(QuestUiEvent.TimerStarted(pomodoroMode, isFocusZoneEnabled))
         }
-        timerJob = viewModelScope.launch {
-            while (countDownSeconds > 0 && isTimerRunning) {
-                delay(1000)
-                countDownSeconds -= 1
-            }
-            if (countDownSeconds == 0) {
-                onTimerFinished()
-            }
-        }
+        
+        val targetEndTime = System.currentTimeMillis() + (countDownSeconds * 1000L)
+        setSystemAlarm(targetEndTime, pomodoroMode)
+        
+        startBackgroundTimerJob()
     }
 
     fun pauseTimer() {
         isTimerRunning = false
         isSuppressionActive = false
         timerJob?.cancel()
+        
+        cancelSystemAlarm()
+        
         viewModelScope.launch {
             _uiEvents.emit(QuestUiEvent.TimerPaused(pomodoroMode))
         }
+        saveTimerPreferences()
     }
 
     fun setTimerMode(mode: String) {
@@ -313,12 +482,15 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
             "long_break" -> 15 * 60
             else -> 25 * 60
         }
+        saveTimerPreferences()
     }
 
     private fun onTimerFinished() {
         isTimerRunning = false
         isSuppressionActive = false
         timerJob?.cancel()
+        
+        cancelSystemAlarm()
         
         val finishedMode = pomodoroMode
         viewModelScope.launch {
@@ -332,7 +504,6 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
                 "long_break" -> 15
                 else -> 25
             }
-            // Save Pomodoro Session records
             repository.insertPomodoroSession(
                 PomodoroSession(
                     durationMinutes = duration,
@@ -342,7 +513,6 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
                 )
             )
 
-            // Switch Mode Automatically to guide the user
             if (pomodoroMode == "work") {
                 setTimerMode("short_break")
                 companionNudge = if (isFocusZoneEnabled) {
@@ -354,12 +524,14 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
                 setTimerMode("work")
                 companionNudge = "Rest period complete. Ready to start your next focus block? Let's build momentum."
             }
+            saveTimerPreferences()
         }
     }
 
     fun resetTimer() {
         pauseTimer()
         setTimerMode(pomodoroMode)
+        saveTimerPreferences()
     }
 
     // --- Tasks and Goals Operations ---
@@ -398,14 +570,24 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
         }
     }
 
-    fun addGoal(title: String, sector: String, targetValue: Float) {
+    fun addGoal(
+        title: String, 
+        sector: String, 
+        targetValue: Float, 
+        dueDate: Long = System.currentTimeMillis() + (7 * 24 * 60 * 60 * 1000L),
+        accountabilityPartner: String = "",
+        consequenceDesc: String = ""
+    ) {
         viewModelScope.launch {
             repository.insertGoal(
                 Goal(
                     title = title,
                     sector = sector,
                     targetValue = targetValue,
-                    currentValue = 0f
+                    currentValue = 0f,
+                    dueDate = dueDate,
+                    accountabilityPartner = accountabilityPartner,
+                    consequenceDesc = consequenceDesc
                 )
             )
             triggerCompanionNudge()
@@ -472,7 +654,8 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
                 4. 🦉 **Companion's Whisper**: A cute, gentle, motivational letter writing directly to me about my progression.
             """.trimIndent()
 
-            val systemPrompt = "You are Chronos, an elite productivity companion, gamification trainer, and wise RPG mentor. Keep reports stylish, engaging, highly structured, in a gorgeous cosmic style."
+            val customDirectives = if (chronosTrainingDirectives.isNotBlank()) "\n[USER CHRONOS TRAINING DIRECTIVES IN EFFECT - STRONGLY INCORPORATE THESE RULES]:\n$chronosTrainingDirectives" else ""
+            val systemPrompt = "You are Chronos, an elite productivity companion, gamification trainer, and wise RPG mentor. Keep reports stylish, engaging, highly structured, in a gorgeous cosmic style.$customDirectives"
 
             val report = GeminiClient.generateAiContent(prompt, systemPrompt)
             if (report.contains("Connection Error") || report.contains("Please configure")) {
@@ -494,7 +677,10 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
         plannedDate: Long? = null,
         temptationBundle: String = "",
         commitmentXpStake: Int = 0,
-        associatedGoalId: Int? = null
+        associatedGoalId: Int? = null,
+        dueDate: Long? = null,
+        accountabilityPartner: String = "",
+        consequenceDesc: String = ""
     ) {
         viewModelScope.launch {
             val basexp = when (quadrant) {
@@ -517,7 +703,10 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
                     temptationBundle = temptationBundle,
                     hasCommitmentContract = hasContract,
                     commitmentXpStake = commitmentXpStake,
-                    associatedGoalId = associatedGoalId
+                    associatedGoalId = associatedGoalId,
+                    dueDate = dueDate,
+                    accountabilityPartner = accountabilityPartner,
+                    consequenceDesc = consequenceDesc
                 )
             )
             if (hasContract) {
@@ -525,8 +714,8 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
                     CommitmentContract(
                         taskTitle = title,
                         xpStake = commitmentXpStake,
-                        penaltyDescription = "Yield character stake penalty if defaulted",
-                        dueDate = System.currentTimeMillis() + (24 * 60 * 60 * 1000)
+                        penaltyDescription = if (consequenceDesc.isNotBlank()) consequenceDesc else "Yield character stake penalty if defaulted",
+                        dueDate = dueDate ?: (System.currentTimeMillis() + (24 * 60 * 60 * 1000L))
                     )
                 )
             }
@@ -534,14 +723,25 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
         }
     }
 
-    fun addGoalWithTasks(title: String, sector: String, targetValue: Float, associatedTaskIds: List<Int>) {
+    fun addGoalWithTasks(
+        title: String, 
+        sector: String, 
+        targetValue: Float, 
+        associatedTaskIds: List<Int>,
+        dueDate: Long = System.currentTimeMillis() + (7 * 24 * 60 * 60 * 1000L),
+        accountabilityPartner: String = "",
+        consequenceDesc: String = ""
+    ) {
         viewModelScope.launch {
             val newGoalId = repository.insertGoal(
                 Goal(
                     title = title,
                     sector = sector,
                     targetValue = targetValue,
-                    currentValue = 0f
+                    currentValue = 0f,
+                    dueDate = dueDate,
+                    accountabilityPartner = accountabilityPartner,
+                    consequenceDesc = consequenceDesc
                 )
             ).toInt()
 
@@ -616,7 +816,8 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
                 3. 🦉 **Ranger Wisdom**: A short, high-energy gaming style motivation letter recommending next week's focus areas (specifically targeting Q2 strategic tasks). Keep output markdown clean.
             """.trimIndent()
             
-            val systemPrompt = "You are Chronos, a wise RPG ranger. Keep reviews stylish, structured, encouraging, in clean markdown."
+            val customDirectives = if (chronosTrainingDirectives.isNotBlank()) "\n[USER CHRONOS TRAINING DIRECTIVES IN EFFECT - STRONGLY INCORPORATE THESE RULES]:\n$chronosTrainingDirectives" else ""
+            val systemPrompt = "You are Chronos, a wise RPG ranger. Keep reviews stylish, structured, encouraging, in clean markdown.$customDirectives"
             val outcome = GeminiClient.generateAiContent(prompt, systemPrompt)
             
             val reflection = WeeklyReflection(
@@ -634,18 +835,73 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
     var aiCoPilotLoading by mutableStateOf(false)
         private set
 
+    private suspend fun forgeLocalFallbackQuests(userFocusTopic: String): Pair<Int, Int> {
+        val topic = userFocusTopic.lowercase().trim()
+        val sector = when {
+            topic.contains("fitness") || topic.contains("cardio") || topic.contains("health") || topic.contains("gym") || topic.contains("run") || topic.contains("workout") || topic.contains("diet") -> "Health"
+            topic.contains("learn") || topic.contains("study") || topic.contains("read") || topic.contains("language") || topic.contains("book") || topic.contains("course") -> "Spiritual"
+            topic.contains("work") || topic.contains("code") || topic.contains("kotlin") || topic.contains("app") || topic.contains("business") || topic.contains("project") || topic.contains("compile") -> "Business"
+            topic.contains("money") || topic.contains("finance") || topic.contains("budget") || topic.contains("save") || topic.contains("invest") -> "Finance"
+            topic.contains("friend") || topic.contains("relationship") || topic.contains("family") || topic.contains("love") || topic.contains("meet") || topic.contains("social") -> "Relationships"
+            else -> "Personal"
+        }
+
+        // Generate personalized title for Goal
+        val goalTitle = when (sector) {
+            "Health" -> "Quest of the Emerald Athlete: Transform physical vigor and stamina regarding '$userFocusTopic'"
+            "Business" -> "Master the Iron Scribe: Dominate business milestones for '$userFocusTopic'"
+            "Spiritual" -> "Path of the Luminary Mind: Attain deep focus and master knowledge on '$userFocusTopic'"
+            "Finance" -> "Hoard of the Golden Dragon: Secure wealth foundation for '$userFocusTopic'"
+            "Relationships" -> "Covenant of the Allied Guild: Elevate personal bonds regarding '$userFocusTopic'"
+            else -> "Ascent of the Chronos Ranger: Complete personal epic trek for '$userFocusTopic'"
+        }
+
+        // Generate associated tasks based on topic / sector
+        val task1Title = when (sector) {
+            "Health" -> "Shield Core Training: Execute active physical physical routine (30 min)"
+            "Business" -> "Architect Blueprint Stage: Outline critical specifications for '$userFocusTopic'"
+            "Spiritual" -> "Sacred Chronos Focus: Commit to deep-read research notes"
+            "Finance" -> "Treasury Audit: Detail resource allocations & accounts"
+            "Relationships" -> "Guild Assembly: Conduct meaningful engagement with key alliances"
+            else -> "Establish Foundation Stone: Clear starting hurdles for '$userFocusTopic'"
+        }
+
+        val task1Quad = 1 // Quadrant 1 (Urgent & Important)
+        val task2Title = when (sector) {
+            "Health" -> "Dietary Alchemist: Prep healthy fuel reserves and hydrate"
+            "Business" -> "Refine Artifact Repository: Refactor and sweep loose ends"
+            "Spiritual" -> "Consolidate Memory Vault: Write custom summary/flashcards"
+            "Finance" -> "Coin Hoarder Ward: Automate reserve savings & mitigate leaks"
+            "Relationships" -> "Empathy Beacon: Dispatch appreciative message / digital gesture"
+            else -> "Scout the Horizon: Map out tomorrow's sequential action items"
+        }
+        val task2Quad = 2 // Quadrant 2 (Important but not Urgent)
+
+        val newGoalId = repository.insertGoal(Goal(title = goalTitle, sector = sector, targetValue = 50f)).toInt()
+        
+        repository.insertTask(Task(title = task1Title, matrixQuadrant = task1Quad, sector = sector, xpReward = 40, targetPomodoros = 2, associatedGoalId = newGoalId))
+        repository.insertTask(Task(title = task2Title, matrixQuadrant = task2Quad, sector = sector, xpReward = 30, targetPomodoros = 2, associatedGoalId = newGoalId))
+
+        return Pair(1, 2)
+    }
+
     fun autoForgeWithCoPilot(userFocusTopic: String, onCompleted: (String) -> Unit) {
         aiCoPilotLoading = true
         viewModelScope.launch {
+            val customDirectives = if (chronosTrainingDirectives.isNotBlank()) {
+                "\n\n[USER CHRONOS TRAINING DIRECTIVES IN EFFECT - MAKE SURE YOUR OUTPUT ADHERES STRONGLY TO THIS PERSONALITY/STYLE]:\n$chronosTrainingDirectives"
+            } else ""
+
             val prompt = """
                 You are Chronos, the elite productivity co-pilot.
                 Create high-importance goals and action-oriented tasks for this topic: "$userFocusTopic"
-                
+                $customDirectives
+
                 I need exactly 1 specific Goal and exactly 2 associated Tasks.
-                Generate them using this STRICT parser pattern so that the APP can read them directly:
+                Generate them using this STRICT parser pattern so that the APP can read them directly. You must output EXACTLY what lies between ===GOAL_BEGIN=== and ===GOAL_END===, and what lies between ===TASKS_BEGIN=== and ===TASKS_END===:
                 
                 ===GOAL_BEGIN===
-                [Title of Goal]|[Life Area Sector like "Health","Business","Spiritual" or "Personal"]|[Target Progress Points e.g. 50]
+                [Title of Goal]|[Life Area Sector like "Health","Business","Spiritual","Relationships","Personal" or "Finance"]|[Target Progress Points e.g. 50]
                 ===GOAL_END===
                 
                 ===TASKS_BEGIN===
@@ -653,70 +909,139 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
                 [Task 2 Title]|[Eisenhower Quadrant 1,2,3 or 4]|[Sector]|[Target Pomodoros]
                 ===TASKS_END===
                 
-                Keep the titles highly inspiring and RPG-flavored.
+                Keep the titles highly inspiring and RPG-flavored. Ensure the Sector matches one of: Business, Health, Spiritual, Relationships, Personal, Finance.
             """.trimIndent()
             
             try {
                 val response = GeminiClient.generateAiContent(prompt, "You are an elite productivity database co-pilot. You print strictly following requested split tokens without extra text outside of tokens.")
                 
-                // Parse Goal
-                val goalRegex = "===GOAL_BEGIN===\\s*(.*?)\\s*===GOAL_END===".toRegex(RegexOption.DOT_MATCHES_ALL)
-                val goalMatch = goalRegex.find(response)
                 var parsedGoalCount = 0
-                if (goalMatch != null) {
-                    val lines = goalMatch.groupValues[1].split("\n").map { it.trim() }.filter { it.isNotEmpty() }
-                    for (line in lines) {
-                        val parts = line.split("|")
-                        if (parts.size >= 3) {
-                            val title = parts[0]
-                            val sector = parts[1]
-                            val target = parts[2].toFloatOrNull() ?: 50f
-                            repository.insertGoal(Goal(title = title, sector = sector, targetValue = target))
-                            parsedGoalCount++
+                var parsedTaskCount = 0
+
+                val isResponseValid = response.isNotBlank() && 
+                        !response.contains("Connection Error") && 
+                        !response.contains("Please configure your GEMINI_API_KEY")
+
+                if (isResponseValid) {
+                    // Parse Goal (Standard Regex)
+                    val goalRegex = "===GOAL_BEGIN===\\s*(.*?)\\s*===GOAL_END===".toRegex(RegexOption.DOT_MATCHES_ALL)
+                    val goalMatch = goalRegex.find(response)
+                    var createdGoalId: Int? = null
+                    if (goalMatch != null) {
+                        val lines = goalMatch.groupValues[1].split("\n").map { it.trim() }.filter { it.isNotEmpty() }
+                        for (line in lines) {
+                            val cleanedLine = line.removeSurrounding("*").removeSurrounding("[").removeSurrounding("]").trim()
+                            val parts = cleanedLine.split("|")
+                            if (parts.size >= 3) {
+                                val title = parts[0].trim()
+                                val sector = parts[1].trim()
+                                val target = parts[2].trim().toFloatOrNull() ?: 50f
+                                createdGoalId = repository.insertGoal(Goal(title = title, sector = sector, targetValue = target)).toInt()
+                                parsedGoalCount++
+                            }
+                        }
+                    }
+
+                    // Parse Tasks (Standard Regex)
+                    val tasksRegex = "===TASKS_BEGIN===\\s*(.*?)\\s*===TASKS_END===".toRegex(RegexOption.DOT_MATCHES_ALL)
+                    val tasksMatch = tasksRegex.find(response)
+                    if (tasksMatch != null) {
+                        val lines = tasksMatch.groupValues[1].split("\n").map { it.trim() }.filter { it.isNotEmpty() }
+                        for (line in lines) {
+                            val cleanedLine = line.removeSurrounding("*").removeSurrounding("[").removeSurrounding("]").trim()
+                            val parts = cleanedLine.split("|")
+                            if (parts.size >= 4) {
+                                val title = parts[0].trim()
+                                val quad = parts[1].trim().toIntOrNull() ?: 2
+                                val sector = parts[2].trim()
+                                val targetPomos = parts[3].trim().toIntOrNull() ?: 2
+                                
+                                val xp = when (quad) {
+                                    1 -> 40
+                                    2 -> 30
+                                    3 -> 20
+                                    4 -> 10
+                                    else -> 20
+                                }
+                                repository.insertTask(
+                                    Task(
+                                        title = title,
+                                        matrixQuadrant = quad,
+                                        sector = sector,
+                                        xpReward = xp,
+                                        targetPomodoros = targetPomos,
+                                        associatedGoalId = createdGoalId
+                                    )
+                                )
+                                parsedTaskCount++
+                            }
+                        }
+                    }
+
+                    // Fallback line-by-line scanning parser in case structure is slightly off
+                    if (parsedGoalCount == 0 || parsedTaskCount == 0) {
+                        val lines = response.split("\n").map { it.trim() }.filter { it.isNotEmpty() && it.contains("|") }
+                        for (line in lines) {
+                            val cleanedLine = line.removePrefix("-").removePrefix("*").trim()
+                                .removeSurrounding("[", "]").removeSurrounding("*").trim()
+                            val parts = cleanedLine.split("|")
+                            if (parts.size >= 3) {
+                                val firstPart = parts[0].trim()
+                                val secondPartInt = parts[1].trim().toIntOrNull()
+                                if (secondPartInt != null && parts.size >= 4 && parsedTaskCount < 2) {
+                                    val title = firstPart
+                                    val quad = secondPartInt
+                                    val sector = parts[2].trim()
+                                    val targetPomos = parts[3].trim().toIntOrNull() ?: 2
+                                    val xp = when (quad) {
+                                        1 -> 40
+                                        2 -> 30
+                                        3 -> 20
+                                        4 -> 10
+                                        else -> 20
+                                    }
+                                    repository.insertTask(
+                                        Task(
+                                            title = title,
+                                            matrixQuadrant = quad,
+                                            sector = sector,
+                                            xpReward = xp,
+                                            targetPomodoros = targetPomos,
+                                            associatedGoalId = createdGoalId
+                                        )
+                                    )
+                                    parsedTaskCount++
+                                } else if (parsedGoalCount < 1) {
+                                    val title = firstPart
+                                    val sector = parts[1].trim()
+                                    val target = parts[2].trim().toFloatOrNull() ?: 50f
+                                    createdGoalId = repository.insertGoal(Goal(title = title, sector = sector, targetValue = target)).toInt()
+                                    parsedGoalCount++
+                                }
+                            }
                         }
                     }
                 }
 
-                // Parse Tasks
-                val tasksRegex = "===TASKS_BEGIN===\\s*(.*?)\\s*===TASKS_END===".toRegex(RegexOption.DOT_MATCHES_ALL)
-                val tasksMatch = tasksRegex.find(response)
-                var parsedTaskCount = 0
-                if (tasksMatch != null) {
-                    val lines = tasksMatch.groupValues[1].split("\n").map { it.trim() }.filter { it.isNotEmpty() }
-                    for (line in lines) {
-                        val parts = line.split("|")
-                        if (parts.size >= 4) {
-                            val title = parts[0]
-                            val quad = parts[1].toIntOrNull() ?: 2
-                            val sector = parts[2]
-                            val targetPomos = parts[3].toIntOrNull() ?: 2
-                            
-                            val xp = when (quad) {
-                                1 -> 40
-                                2 -> 30
-                                3 -> 20
-                                4 -> 10
-                                else -> 20
-                            }
-                            repository.insertTask(
-                                Task(
-                                    title = title,
-                                    matrixQuadrant = quad,
-                                    sector = sector,
-                                    xpReward = xp,
-                                    targetPomodoros = targetPomos
-                                )
-                            )
-                            parsedTaskCount++
-                        }
-                    }
+                // If parsing yielded nothing or input response was invalid (due to missing key or network)
+                if (parsedGoalCount == 0 || parsedTaskCount == 0) {
+                    forgeLocalFallbackQuests(userFocusTopic)
+                    aiCoPilotLoading = false
+                    onCompleted("Successfully forged offline quests! (Note: Chronos crafted these locally using stored roleplay presets because the Gemini API is offline/unconfigured).")
+                } else {
+                    aiCoPilotLoading = false
+                    onCompleted("Successfully forged $parsedGoalCount Goal and $parsedTaskCount Tasks for '$userFocusTopic'!")
                 }
-                
-                aiCoPilotLoading = false
-                onCompleted("Successfully forged $parsedGoalCount Goal and $parsedTaskCount Tasks for '$userFocusTopic'!")
             } catch (e: Exception) {
-                aiCoPilotLoading = false
-                onCompleted("Error in forging: ${e.localizedMessage}")
+                // If any error occurs, guarantee task creation through local fallback!
+                try {
+                    forgeLocalFallbackQuests(userFocusTopic)
+                    aiCoPilotLoading = false
+                    onCompleted("Successfully forged offline quests! (Chronos activated emergency backup templates).")
+                } catch (ex: Exception) {
+                    aiCoPilotLoading = false
+                    onCompleted("Error in forging: ${e.localizedMessage}")
+                }
             }
         }
     }
