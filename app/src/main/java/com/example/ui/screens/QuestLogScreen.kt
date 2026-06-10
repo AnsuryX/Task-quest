@@ -220,12 +220,18 @@ fun QuestLogScreen(
 
     // Add Task / Quest dialogue containing behavioral enhancers
     if (showAddTaskDialog) {
+        val calendar = java.util.Calendar.getInstance()
+        val dayOfWeekFormat = java.text.SimpleDateFormat("EEEE", java.util.Locale.US)
+        val initialDay = dayOfWeekFormat.format(calendar.time)
+
         val goals by viewModel.goals.collectAsState()
         var questTitle by remember { mutableStateOf("") }
         var questNotes by remember { mutableStateOf("") }
         var selectedQuadrant by remember { mutableStateOf(2) } // default Q2 strategic growth
         var selectedSector by remember { mutableStateOf("Business") }
-        var plannedDay by remember { mutableStateOf<String?>("Monday") }
+        var plannedDay by remember { mutableStateOf<String?>(initialDay) }
+        var isRepeating by remember { mutableStateOf(false) }
+        var repeatInterval by remember { mutableStateOf("None") }
         var temptationBundle by remember { mutableStateOf("") }
         var commitmentXpStake by remember { mutableStateOf("0") }
         var selectedGoalId by remember { mutableStateOf<Int?>(null) }
@@ -424,6 +430,54 @@ fun QuestLogScreen(
                         }
                     }
 
+                    // Behavioral Addition D: Repeating Quest Configuration
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Repeat, contentDescription = "Repeat", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Column {
+                                Text("Repeating Quest", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                Text("Automatically re-schedules on complete", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                            }
+                        }
+                        Switch(
+                            checked = isRepeating,
+                            onCheckedChange = { 
+                                isRepeating = it
+                                if (it && repeatInterval == "None") {
+                                    repeatInterval = "Daily"
+                                } else if (!it) {
+                                    repeatInterval = "None"
+                                }
+                            },
+                            modifier = Modifier.testTag("quest_repeat_switch")
+                        )
+                    }
+
+                    if (isRepeating) {
+                        Text("Repetition Interval", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            val intervals = listOf("Daily", "Weekly", "Monthly")
+                            intervals.forEach { interval ->
+                                val isSel = repeatInterval == interval
+                                FilterChip(
+                                    selected = isSel,
+                                    onClick = { repeatInterval = interval },
+                                    label = { Text(interval, fontSize = 11.sp) },
+                                    modifier = Modifier.testTag("repeat_interval_$interval")
+                                )
+                            }
+                        }
+                    }
+
                     if (errorState) {
                         Text("Please enter a valid quest title.", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
                     }
@@ -456,13 +510,15 @@ fun QuestLogScreen(
                                         quadrant = selectedQuadrant,
                                         sector = selectedSector,
                                         plannedDay = plannedDay,
-                                        plannedDate = null,
+                                        plannedDate = System.currentTimeMillis(),
                                         temptationBundle = temptationBundle.trim(),
                                         commitmentXpStake = xpToStake,
                                         associatedGoalId = selectedGoalId,
                                         dueDate = targetDueDate,
                                         accountabilityPartner = accountabilityPartner.trim(),
-                                        consequenceDesc = consequenceDesc.trim()
+                                        consequenceDesc = consequenceDesc.trim(),
+                                        isRepeating = isRepeating,
+                                        repeatInterval = repeatInterval
                                     )
                                     showAddTaskDialog = false
                                 } else {
@@ -669,6 +725,7 @@ fun ExpandedTaskRow(
     onComplete: (Task) -> Unit,
     onDelete: (Task) -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val quadrantColor = when (task.matrixQuadrant) {
         1 -> Quadrant1Color
         2 -> Quadrant2Color
@@ -775,6 +832,14 @@ fun ExpandedTaskRow(
                         )
                     }
 
+                    if (task.isRepeating) {
+                        SuggestionChip(
+                            onClick = {},
+                            label = { Text("🔄 Cycle: ${task.repeatInterval}", fontSize = 10.sp, fontWeight = FontWeight.Bold) },
+                            colors = SuggestionChipDefaults.suggestionChipColors(labelColor = MaterialTheme.colorScheme.primary)
+                        )
+                    }
+
                     if (task.consequenceDesc.isNotEmpty() && !task.completed) {
                         SuggestionChip(
                             onClick = {},
@@ -796,16 +861,31 @@ fun ExpandedTaskRow(
                     color = if (task.completed) NeonGreen else NeonAmber,
                     fontSize = 11.sp
                 )
-                IconButton(
-                    onClick = { onDelete(task) },
-                    modifier = Modifier.testTag("delete_task_row_${task.id}")
-                ) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = "Delete",
-                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
-                        modifier = Modifier.size(20.dp)
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = { 
+                            com.example.util.CalendarSyncHelper.insertTaskToCalendarIntent(context, task)
+                        },
+                        modifier = Modifier.testTag("calendar_sync_task_${task.id}")
+                    ) {
+                        Icon(
+                            Icons.Default.CalendarToday,
+                            contentDescription = "Sync to Calendar",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = { onDelete(task) },
+                        modifier = Modifier.testTag("delete_task_row_${task.id}")
+                    ) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Delete",
+                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
         }

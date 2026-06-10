@@ -81,6 +81,33 @@ class QuestRepository(private val questDao: QuestDao) {
         )
         questDao.updateTask(completedTask)
 
+        // If repeating, schedule next instance
+        if (task.isRepeating && task.repeatInterval != "None") {
+            val incrementMs = when (task.repeatInterval) {
+                "Daily" -> 24 * 60 * 60 * 1000L
+                "Weekly" -> 7 * 24 * 60 * 60 * 1000L
+                "Monthly" -> 30L * 24 * 60 * 60 * 1000L
+                else -> 0L
+            }
+            if (incrementMs > 0L) {
+                val nextPlannedDate = (task.plannedDate ?: System.currentTimeMillis()) + incrementMs
+                val sdf = java.text.SimpleDateFormat("EEEE", java.util.Locale.US)
+                val nextPlannedDay = sdf.format(java.util.Date(nextPlannedDate))
+                
+                val nextTask = task.copy(
+                    id = 0, // Auto-generate new primary key
+                    completed = false,
+                    completedAt = null,
+                    pomodorosSpent = 0,
+                    createdAt = System.currentTimeMillis(),
+                    plannedDay = nextPlannedDay,
+                    plannedDate = nextPlannedDate,
+                    dueDate = task.dueDate?.let { it + incrementMs }
+                )
+                questDao.insertTask(nextTask)
+            }
+        }
+
         // Give User XP
         val currentStats = getOrCreateUserStats()
         

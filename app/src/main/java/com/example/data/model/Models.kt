@@ -26,7 +26,9 @@ data class Task(
     val associatedGoalId: Int? = null,
     val dueDate: Long? = null,
     val accountabilityPartner: String = "",
-    val consequenceDesc: String = ""
+    val consequenceDesc: String = "",
+    val isRepeating: Boolean = false,
+    val repeatInterval: String = "None" // "None", "Daily", "Weekly", "Monthly"
 )
 
 @Entity(tableName = "goals")

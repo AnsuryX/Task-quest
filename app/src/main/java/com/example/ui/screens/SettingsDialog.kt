@@ -49,6 +49,28 @@ fun SettingsDialog(
     val scrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
 
+    var hasCalendarPermission by remember {
+        mutableStateOf(
+            androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.WRITE_CALENDAR) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    val calendarPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val writeGranted = permissions[android.Manifest.permission.WRITE_CALENDAR] ?: false
+        val readGranted = permissions[android.Manifest.permission.READ_CALENDAR] ?: false
+        if (writeGranted && readGranted) {
+            hasCalendarPermission = true
+            viewModel.saveCalendarSyncSetting(context, true)
+            Toast.makeText(context, "Google Calendar Auto Sync Enabled!", Toast.LENGTH_SHORT).show()
+        } else {
+            hasCalendarPermission = false
+            viewModel.saveCalendarSyncSetting(context, false)
+            Toast.makeText(context, "Calendar permissions are required for background sync.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     var activeTab by remember { mutableStateOf(0) } // 0 = Audio & Alert Permissions, 1 = Cloud Sync Account, 2 = Scroll Backup
 
     // Form states for Account Sync Registration
@@ -290,6 +312,83 @@ fun SettingsDialog(
                                                 }
                                             }
                                         }
+                                    }
+                                }
+
+                                Spacer(Modifier.height(16.dp))
+
+                                // --- GOOGLE CALENDAR AUTOMATED SYNCHRONIZATION ---
+                                Text(
+                                    "📅 GOOGLE CALENDAR AUTOMATED BRIDGE",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = NeonCyan,
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+
+                                Card(
+                                    modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                                    ),
+                                    border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
+                                ) {
+                                    Column(modifier = Modifier.padding(14.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    Icons.Default.CalendarMonth,
+                                                    contentDescription = "Google Calendar",
+                                                    tint = NeonCyan,
+                                                    modifier = Modifier.size(24.dp)
+                                                )
+                                                Spacer(Modifier.width(8.dp))
+                                                Column {
+                                                    Text(
+                                                        text = "Auto-Sync New Quests",
+                                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                                        color = MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                    Text(
+                                                        text = "Sync newly created tasks with Google Calendar",
+                                                        fontSize = 11.sp,
+                                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                                    )
+                                                }
+                                            }
+                                            Switch(
+                                                checked = viewModel.isCalendarSyncEnabled,
+                                                onCheckedChange = { checked ->
+                                                    if (checked) {
+                                                        if (hasCalendarPermission) {
+                                                            viewModel.saveCalendarSyncSetting(context, true)
+                                                        } else {
+                                                            calendarPermissionLauncher.launch(
+                                                                arrayOf(
+                                                                    android.Manifest.permission.READ_CALENDAR,
+                                                                    android.Manifest.permission.WRITE_CALENDAR
+                                                                )
+                                                            )
+                                                        }
+                                                    } else {
+                                                        viewModel.saveCalendarSyncSetting(context, false)
+                                                    }
+                                                },
+                                                modifier = Modifier.testTag("calendar_sync_switch")
+                                            )
+                                        }
+
+                                        Spacer(Modifier.height(10.dp))
+                                        Text(
+                                            text = "When activated, any newly enlisted quest is instantly integrated into your primary Google Calendar in the background, complete with notes, scheduled date, and XP rewards. You can also manual sync any quest by clicking the 📅 button on its card.",
+                                            fontSize = 11.sp,
+                                            lineHeight = 15.sp,
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                                        )
                                     }
                                 }
 

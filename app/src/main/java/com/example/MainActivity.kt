@@ -11,6 +11,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -139,11 +140,20 @@ class MainActivity : ComponentActivity() {
                 val stats by viewModel.userStats.collectAsState()
                 var currentNavIndex by remember { mutableStateOf(0) } // 0 = Dashboard, 1 = Quest Log, 2 = Focus Chamber
                 var showSettingsDialog by remember { mutableStateOf(false) }
+                var showCompanionDialog by remember { mutableStateOf(false) }
 
                 if (showSettingsDialog) {
                     com.example.ui.screens.SettingsDialog(
                         viewModel = viewModel,
                         onDismiss = { showSettingsDialog = false }
+                    )
+                }
+
+                if (showCompanionDialog) {
+                    com.example.ui.screens.CompanionConsultationDialog(
+                        showDialog = showCompanionDialog,
+                        onDismiss = { showCompanionDialog = false },
+                        viewModel = viewModel
                     )
                 }
 
@@ -304,7 +314,10 @@ class MainActivity : ComponentActivity() {
 
                             // Row 3: Companion Dialogue Card
                             Card(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { showCompanionDialog = true }
+                                    .testTag("companion_card_trigger"),
                                 shape = RoundedCornerShape(14.dp),
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                                 border = BorderStroke(1.dp, NeonCyan.copy(alpha = 0.25f))

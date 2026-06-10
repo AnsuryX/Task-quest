@@ -80,6 +80,7 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
     var syncLogs by mutableStateOf("No synchronization performed in this session. Cloud vault ready.")
     var isSyncInProgress by mutableStateOf(false)
     var chronosTrainingDirectives by mutableStateOf("")
+    var isCalendarSyncEnabled by mutableStateOf(false)
 
     private var appContext: android.content.Context? = null
 
@@ -94,7 +95,16 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
         cloudUserNickname = prefs.getString("cloud_user_nickname", "") ?: ""
         isLoggedIn = prefs.getBoolean("is_logged_in", false)
         chronosTrainingDirectives = prefs.getString("chronos_training_directives", "") ?: ""
+        isCalendarSyncEnabled = prefs.getBoolean("is_calendar_sync_enabled", false)
         reconcileTimerState(applicationContext)
+    }
+
+    fun saveCalendarSyncSetting(context: android.content.Context, enabled: Boolean) {
+        isCalendarSyncEnabled = enabled
+        val prefs = context.getSharedPreferences("quest_settings", android.content.Context.MODE_PRIVATE)
+        prefs.edit()
+            .putBoolean("is_calendar_sync_enabled", enabled)
+            .apply()
     }
 
     fun saveChronosTrainingDirectives(context: android.content.Context, directives: String) {
@@ -680,7 +690,9 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
         associatedGoalId: Int? = null,
         dueDate: Long? = null,
         accountabilityPartner: String = "",
-        consequenceDesc: String = ""
+        consequenceDesc: String = "",
+        isRepeating: Boolean = false,
+        repeatInterval: String = "None"
     ) {
         viewModelScope.launch {
             val basexp = when (quadrant) {
@@ -691,7 +703,7 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
                 else -> 20
             }
             val hasContract = commitmentXpStake > 0
-            repository.insertTask(
+            val newId = repository.insertTask(
                 Task(
                     title = title,
                     notes = notes,
@@ -706,9 +718,35 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
                     associatedGoalId = associatedGoalId,
                     dueDate = dueDate,
                     accountabilityPartner = accountabilityPartner,
-                    consequenceDesc = consequenceDesc
+                    consequenceDesc = consequenceDesc,
+                    isRepeating = isRepeating,
+                    repeatInterval = repeatInterval
                 )
             )
+            if (isCalendarSyncEnabled) {
+                appContext?.let { context ->
+                    val freshTask = Task(
+                        id = newId.toInt(),
+                        title = title,
+                        notes = notes,
+                        matrixQuadrant = quadrant,
+                        sector = sector,
+                        xpReward = basexp,
+                        plannedDay = plannedDay,
+                        plannedDate = plannedDate,
+                        temptationBundle = temptationBundle,
+                        hasCommitmentContract = hasContract,
+                        commitmentXpStake = commitmentXpStake,
+                        associatedGoalId = associatedGoalId,
+                        dueDate = dueDate,
+                        accountabilityPartner = accountabilityPartner,
+                        consequenceDesc = consequenceDesc,
+                        isRepeating = isRepeating,
+                        repeatInterval = repeatInterval
+                    )
+                    com.example.util.CalendarSyncHelper.syncTaskToCalendarSilently(context, freshTask)
+                }
+            }
             if (hasContract) {
                 repository.insertCommitmentContract(
                     CommitmentContract(
@@ -1044,6 +1082,46 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
                 }
             }
         }
+    }
+
+    val companionChatHistory = androidx.compose.runtime.mutableStateListOf<Pair<String, String>>()
+    var isCompanionChatLoading by mutableStateOf(false)
+
+    fun queryCompanion(message: String) {
+        if (message.isBlank()) return
+        companionChatHistory.add("User" to message)
+        isCompanionChatLoading = true
+        viewModelScope.launch {
+            try {
+                val statsValue = userStats.value
+                val activeTasksStr = tasks.value.filter { !it.completed }.joinToString("\n") {
+                    "- [Q${it.matrixQuadrant}] ${it.title} in sector ${it.sector}"
+                }
+                val contextPrompt = """
+                    You are Chronos, a legendary RPG Productivity Mentor and AI Companion.
+                    User level: ${statsValue?.level ?: 1}
+                    XP: ${statsValue?.xp ?: 0}/${statsValue?.xpForNextLevel ?: 250}
+                    Streak: ${statsValue?.streakDays ?: 1} Days
+                    Active Quests:
+                    $activeTasksStr
+                    
+                    User message: "$message"
+                    
+                    Respond to the user's message as Chronos. Keep your tone immersive, inspiring, RPG-flavored, yet practical. Keep it relatively concise (under 130 words), direct, and incredibly motivating.
+                """.trimIndent()
+                val systemPrompt = "You are Chronos, an elite productivity companion, gamification trainer, and wise RPG mentor."
+                val reply = GeminiClient.generateAiContent(contextPrompt, systemPrompt)
+                companionChatHistory.add("Chronos" to reply)
+            } catch (e: Exception) {
+                companionChatHistory.add("Chronos" to "The cosmic gateway is slightly unstable, Hero. Let's try syncing again. (Error: ${e.localizedMessage})")
+            } finally {
+                isCompanionChatLoading = false
+            }
+        }
+    }
+
+    fun clearCompanionChat() {
+        companionChatHistory.clear()
     }
 }
 
