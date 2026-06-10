@@ -1,0 +1,6 @@
+{
+  "name": "Ansury Quest",
+  "description": "A beautiful, premium gamified productivity application containing Eisenhower matrix task boards, Pomodoro timers, and Gemini-powered professional progress reports & suggestions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
