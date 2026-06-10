@@ -66,6 +66,7 @@ fun DashboardScreen(
     val tasks by viewModel.tasks.collectAsState()
     val intentions by viewModel.intentions.collectAsState()
     val commitmentContracts by viewModel.commitmentContracts.collectAsState()
+    val pomodoroSessions by viewModel.pomodoroSessions.collectAsState()
 
     var showAddGoalDialog by remember { mutableStateOf(false) }
     var isCodexExpanded by remember { mutableStateOf(false) }
@@ -464,6 +465,281 @@ fun DashboardScreen(
                                     Icon(Icons.Default.Bolt, contentDescription = "Forge", modifier = Modifier.size(14.dp))
                                     Spacer(Modifier.width(4.dp))
                                     Text("Forge Quests", fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            var showHoloShare by remember { mutableStateOf(false) }
+
+            val startOfDayMs = remember(tasks, pomodoroSessions) {
+                java.util.Calendar.getInstance().apply {
+                    set(java.util.Calendar.HOUR_OF_DAY, 0)
+                    set(java.util.Calendar.MINUTE, 0)
+                    set(java.util.Calendar.SECOND, 0)
+                    set(java.util.Calendar.MILLISECOND, 0)
+                }.timeInMillis
+            }
+
+            val tasksCompletedTodayList = remember(tasks, startOfDayMs) {
+                tasks.filter { it.completed && (it.completedAt ?: 0L) >= startOfDayMs }
+            }
+            val tasksCompletedTodayCount = tasksCompletedTodayList.size
+
+            val focusMinsTodayCount = remember(pomodoroSessions, startOfDayMs) {
+                pomodoroSessions.filter { it.timestamp >= startOfDayMs && it.type == "work" }
+                    .sumOf { it.durationMinutes }
+            }
+
+            val q1Today = tasksCompletedTodayList.count { it.matrixQuadrant == 1 }
+            val q2Today = tasksCompletedTodayList.count { it.matrixQuadrant == 2 }
+            val q3Today = tasksCompletedTodayList.count { it.matrixQuadrant == 3 }
+            val q4Today = tasksCompletedTodayList.count { it.matrixQuadrant == 4 }
+
+            if (showHoloShare) {
+                HoloShareBadgeDialog(
+                    show = showHoloShare,
+                    onDismiss = { showHoloShare = false },
+                    userStats = stats,
+                    tasksCompletedToday = tasksCompletedTodayCount,
+                    focusMinutesToday = focusMinsTodayCount
+                )
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth().testTag("daily_analytics_and_milestones_card"),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, NeonPurple.copy(alpha = 0.2f))
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("📊", fontSize = 24.sp)
+                            Spacer(Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "DAILY RECONCILIATION",
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.ExtraBold,
+                                        letterSpacing = 0.5.sp
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "Real-time behavior analytics",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                )
+                            }
+                        }
+
+                        Button(
+                            onClick = { showHoloShare = true },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = NeonCyan.copy(alpha = 0.15f),
+                                contentColor = NeonCyan
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                            modifier = Modifier.height(34.dp).testTag("trigger_holo_id_button")
+                        ) {
+                            Icon(Icons.Default.Share, contentDescription = "Share ID", modifier = Modifier.size(12.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Share ID", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Card(
+                            modifier = Modifier.weight(1f),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)),
+                            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(10.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text("QUESTS TODAY", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+                                Text("$tasksCompletedTodayCount", fontSize = 20.sp, fontWeight = FontWeight.Black, color = NeonGreen)
+                            }
+                        }
+
+                        Card(
+                            modifier = Modifier.weight(1f),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)),
+                            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(10.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text("FOCUS TODAY", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+                                Text("$focusMinsTodayCount m", fontSize = 20.sp, fontWeight = FontWeight.Black, color = NeonPurple)
+                            }
+                        }
+                    }
+
+                    Text(
+                        text = "EISENHOWER SYMMETRY BALANCER",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black,
+                        color = NeonCyan,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f), RoundedCornerShape(10.dp))
+                            .padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val totalComp = if (tasksCompletedTodayCount > 0) tasksCompletedTodayCount.toFloat() else 1f
+                        
+                        Column {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(" Q1: Urgent & Important", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f))
+                                Text("$q1Today Quests", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Quadrant1Color)
+                            }
+                            Spacer(Modifier.height(4.dp))
+                            LinearProgressIndicator(
+                                progress = { q1Today.toFloat() / totalComp },
+                                modifier = Modifier.fillMaxWidth().height(6.dp),
+                                color = Quadrant1Color,
+                                trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
+                                strokeCap = StrokeCap.Round
+                            )
+                        }
+
+                        Column {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(" Q2: Important & Not Urgent", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f))
+                                Text("$q2Today Quests", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Quadrant2Color)
+                            }
+                            Spacer(Modifier.height(4.dp))
+                            LinearProgressIndicator(
+                                progress = { q2Today.toFloat() / totalComp },
+                                modifier = Modifier.fillMaxWidth().height(6.dp),
+                                color = Quadrant2Color,
+                                trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
+                                strokeCap = StrokeCap.Round
+                            )
+                        }
+
+                        Column {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(" Q3: Urgent & Not Important", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f))
+                                Text("$q3Today Quests", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Quadrant3Color)
+                            }
+                            Spacer(Modifier.height(4.dp))
+                            LinearProgressIndicator(
+                                progress = { q3Today.toFloat() / totalComp },
+                                modifier = Modifier.fillMaxWidth().height(6.dp),
+                                color = Quadrant3Color,
+                                trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
+                                strokeCap = StrokeCap.Round
+                            )
+                        }
+
+                        Column {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(" Q4: Not Urgent & Not Important", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f))
+                                Text("$q4Today Quests", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Quadrant4Color)
+                            }
+                            Spacer(Modifier.height(4.dp))
+                            LinearProgressIndicator(
+                                progress = { q4Today.toFloat() / totalComp },
+                                modifier = Modifier.fillMaxWidth().height(6.dp),
+                                color = Quadrant4Color,
+                                trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
+                                strokeCap = StrokeCap.Round
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(14.dp))
+
+                    Text(
+                        text = "BEHAVIORAL MILESTONES (CHRONOS LOG)",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black,
+                        color = NeonPurple,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    val milestonesList = remember(tasks, pomodoroSessions, viewModel.chronosTrainingDirectives, tasksCompletedTodayList, focusMinsTodayCount) {
+                        listOf(
+                            Triple(
+                                "Pioneering Planner (Q2 Master)",
+                                "Complete at least 1 Quest in the important Q2 quadrant today.",
+                                tasksCompletedTodayList.any { it.matrixQuadrant == 2 }
+                            ),
+                            Triple(
+                                "Sanctum Guardian (Deep Focus)",
+                                "Sustain focus in Pomodoro for at least 25 minutes today.",
+                                focusMinsTodayCount >= 25
+                            ),
+                            Triple(
+                                "Oracle's Disciple (Persona Tuned)",
+                                "Prime/Train the Chronos AI Personality custom directives.",
+                                viewModel.chronosTrainingDirectives.isNotBlank()
+                            ),
+                            Triple(
+                                "Pact Forger (Commitment Oath)",
+                                "Have at least 1 Quest with an active Commitment Contract.",
+                                tasks.any { it.hasCommitmentContract }
+                            )
+                        )
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        milestonesList.forEach { (name, rule, achieved) ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (achieved) NeonGreen.copy(alpha = 0.05f) 
+                                                   else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
+                                ),
+                                border = BorderStroke(
+                                    0.5.dp, 
+                                    if (achieved) NeonGreen.copy(alpha = 0.4f) 
+                                    else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                                )
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = if (achieved) "❇️" else "🛑",
+                                        fontSize = 16.sp
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            text = name,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (achieved) NeonGreen else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                                        )
+                                        Text(
+                                            text = rule,
+                                            fontSize = 10.sp,
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                        )
+                                    }
                                 }
                             }
                         }
