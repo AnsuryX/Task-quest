@@ -75,94 +75,141 @@ class QuestRepository(private val questDao: QuestDao) {
 
     // --- Core Gamification Mechanics ---
     suspend fun completeTask(task: Task) {
-        val completedTask = task.copy(
-            completed = true,
-            completedAt = System.currentTimeMillis()
-        )
-        questDao.updateTask(completedTask)
+        val latestTask = questDao.getTaskById(task.id) ?: return
+        if (latestTask.completed) {
+            val uncompletedTask = latestTask.copy(
+                completed = false,
+                completedAt = null
+            )
+            questDao.updateTask(uncompletedTask)
 
-        // If repeating, schedule next instance
-        if (task.isRepeating && task.repeatInterval != "None") {
-            val incrementMs = when (task.repeatInterval) {
-                "Daily" -> 24 * 60 * 60 * 1000L
-                "Weekly" -> 7 * 24 * 60 * 60 * 1000L
-                "Monthly" -> 30L * 24 * 60 * 60 * 1000L
-                else -> 0L
-            }
-            if (incrementMs > 0L) {
-                val nextPlannedDate = (task.plannedDate ?: System.currentTimeMillis()) + incrementMs
-                val sdf = java.text.SimpleDateFormat("EEEE", java.util.Locale.US)
-                val nextPlannedDay = sdf.format(java.util.Date(nextPlannedDate))
-                
-                val nextTask = task.copy(
-                    id = 0, // Auto-generate new primary key
-                    completed = false,
-                    completedAt = null,
-                    pomodorosSpent = 0,
-                    createdAt = System.currentTimeMillis(),
-                    plannedDay = nextPlannedDay,
-                    plannedDate = nextPlannedDate,
-                    dueDate = task.dueDate?.let { it + incrementMs }
-                )
-                questDao.insertTask(nextTask)
-            }
-        }
+            // Subtract User XP and decrement completed quests count
+            val currentStats = getOrCreateUserStats()
+            val baseReward = latestTask.xpReward
+            val streakMultiplier = 1.0 + (java.lang.Math.min(5, currentStats.streakDays - 1) * 0.1)
+            val finalXpReward = (baseReward * streakMultiplier).toInt()
 
-        // Give User XP
-        val currentStats = getOrCreateUserStats()
-        
-        // Check Streaks
-        val now = System.currentTimeMillis()
-        val currentEpochDay = TimeUnit.MILLISECONDS.toDays(now)
-        val lastActiveEpochDay = TimeUnit.MILLISECONDS.toDays(currentStats.lastActiveTimestamp)
-        
-        var newStreak = currentStats.streakDays
-        if (currentEpochDay == lastActiveEpochDay + 1) {
-            newStreak += 1 // increment streak
-        } else if (currentEpochDay > lastActiveEpochDay + 1) {
-            newStreak = 1 // reset streak
-        }
+            val updatedStats = currentStats.copy(
+                xp = java.lang.Math.max(0, currentStats.xp - finalXpReward),
+                questsCompleted = java.lang.Math.max(0, currentStats.questsCompleted - 1)
+            )
+            questDao.insertUserStats(updatedStats)
 
-        val baseReward = completedTask.xpReward
-        // 10% bonus XP per day of active streak (up to 50% max)
-        val streakMultiplier = 1.0 + (java.lang.Math.min(5, newStreak - 1) * 0.1)
-        val finalXpReward = (baseReward * streakMultiplier).toInt()
+            // Revert progress of associated Goal: prioritizes specific associatedGoalId, falls back to sector
+            if (latestTask.associatedGoalId != null) {
+                val allGoals = questDao.getAllGoals().firstOrNull() ?: emptyList()
+                val linkedGoal = allGoals.find { it.id == latestTask.associatedGoalId }
+                if (linkedGoal != null) {
+                    val newValue = java.lang.Math.max(0f, linkedGoal.currentValue - 15f)
+                    questDao.updateGoal(linkedGoal.copy(
+                        currentValue = newValue,
+                        completed = newValue >= linkedGoal.targetValue
+                    ))
+                }
+            } else {
+                // fallback to goals in task sector
+                val activeGoals = questDao.getAllGoals().firstOrNull()?.filter { 
+                    it.sector.equals(latestTask.sector, ignoreCase = true)
+                } ?: emptyList()
 
-        val updatedStats = currentStats.copy(
-            xp = currentStats.xp + finalXpReward,
-            questsCompleted = currentStats.questsCompleted + 1,
-            streakDays = newStreak,
-            lastActiveTimestamp = now
-        )
-
-        val leveledStats = handleLevelUp(updatedStats)
-        questDao.insertUserStats(leveledStats)
-
-        // Increment related Goal: prioritises specific associatedGoalId, falls back to sector
-        if (task.associatedGoalId != null) {
-            val allGoals = questDao.getAllGoals().firstOrNull() ?: emptyList()
-            val linkedGoal = allGoals.find { it.id == task.associatedGoalId }
-            if (linkedGoal != null && !linkedGoal.completed) {
-                val newValue = linkedGoal.currentValue + 15f // specific goal gets +15 points!
-                val isCompleted = newValue >= linkedGoal.targetValue
-                questDao.updateGoal(linkedGoal.copy(
-                    currentValue = if (isCompleted) linkedGoal.targetValue else newValue,
-                    completed = isCompleted
-                ))
+                for (goal in activeGoals) {
+                    val newValue = java.lang.Math.max(0f, goal.currentValue - 10f)
+                    questDao.updateGoal(goal.copy(
+                        currentValue = newValue,
+                        completed = newValue >= goal.targetValue
+                    ))
+                }
             }
         } else {
-            // fallback to any active goals in task sector
-            val activeGoals = questDao.getAllGoals().firstOrNull()?.filter { 
-                it.sector.equals(task.sector, ignoreCase = true) && !it.completed 
-            } ?: emptyList()
+            val completedTask = latestTask.copy(
+                completed = true,
+                completedAt = System.currentTimeMillis()
+            )
+            questDao.updateTask(completedTask)
 
-            for (goal in activeGoals) {
-                val newValue = goal.currentValue + 10f // complete task gives +10 completion progress points to sector goal
-                val isCompleted = newValue >= goal.targetValue
-                questDao.updateGoal(goal.copy(
-                    currentValue = if (isCompleted) goal.targetValue else newValue,
-                    completed = isCompleted
-                ))
+            // If repeating, schedule next instance
+            if (latestTask.isRepeating && latestTask.repeatInterval != "None") {
+                val incrementMs = when (latestTask.repeatInterval) {
+                    "Daily" -> 24 * 60 * 60 * 1000L
+                    "Weekly" -> 7 * 24 * 60 * 60 * 1000L
+                    "Monthly" -> 30L * 24 * 60 * 60 * 1000L
+                    else -> 0L
+                }
+                if (incrementMs > 0L) {
+                    val nextPlannedDate = (latestTask.plannedDate ?: System.currentTimeMillis()) + incrementMs
+                    val sdf = java.text.SimpleDateFormat("EEEE", java.util.Locale.US)
+                    val nextPlannedDay = sdf.format(java.util.Date(nextPlannedDate))
+                    
+                    val nextTask = latestTask.copy(
+                        id = 0, // Auto-generate new primary key
+                        completed = false,
+                        completedAt = null,
+                        pomodorosSpent = 0,
+                        createdAt = System.currentTimeMillis(),
+                        plannedDay = nextPlannedDay,
+                        plannedDate = nextPlannedDate,
+                        dueDate = latestTask.dueDate?.let { it + incrementMs }
+                    )
+                    questDao.insertTask(nextTask)
+                }
+            }
+
+            // Give User XP
+            val currentStats = getOrCreateUserStats()
+            
+            // Check Streaks
+            val now = System.currentTimeMillis()
+            val currentEpochDay = TimeUnit.MILLISECONDS.toDays(now)
+            val lastActiveEpochDay = TimeUnit.MILLISECONDS.toDays(currentStats.lastActiveTimestamp)
+            
+            var newStreak = currentStats.streakDays
+            if (currentEpochDay == lastActiveEpochDay + 1) {
+                newStreak += 1 // increment streak
+            } else if (currentEpochDay > lastActiveEpochDay + 1) {
+                newStreak = 1 // reset streak
+            }
+
+            val baseReward = completedTask.xpReward
+            // 10% bonus XP per day of active streak (up to 50% max)
+            val streakMultiplier = 1.0 + (java.lang.Math.min(5, newStreak - 1) * 0.1)
+            val finalXpReward = (baseReward * streakMultiplier).toInt()
+
+            val updatedStats = currentStats.copy(
+                xp = currentStats.xp + finalXpReward,
+                questsCompleted = currentStats.questsCompleted + 1,
+                streakDays = newStreak,
+                lastActiveTimestamp = now
+            )
+
+            val leveledStats = handleLevelUp(updatedStats)
+            questDao.insertUserStats(leveledStats)
+
+            // Increment related Goal: prioritises specific associatedGoalId, falls back to sector
+            if (latestTask.associatedGoalId != null) {
+                val allGoals = questDao.getAllGoals().firstOrNull() ?: emptyList()
+                val linkedGoal = allGoals.find { it.id == latestTask.associatedGoalId }
+                if (linkedGoal != null && !linkedGoal.completed) {
+                    val newValue = linkedGoal.currentValue + 15f // specific goal gets +15 points!
+                    val isCompleted = newValue >= linkedGoal.targetValue
+                    questDao.updateGoal(linkedGoal.copy(
+                        currentValue = if (isCompleted) linkedGoal.targetValue else newValue,
+                        completed = isCompleted
+                    ))
+                }
+            } else {
+                // fallback to any active goals in task sector
+                val activeGoals = questDao.getAllGoals().firstOrNull()?.filter { 
+                    it.sector.equals(latestTask.sector, ignoreCase = true) && !it.completed 
+                } ?: emptyList()
+
+                for (goal in activeGoals) {
+                    val newValue = goal.currentValue + 10f // complete task gives +10 completion progress points to sector goal
+                    val isCompleted = newValue >= goal.targetValue
+                    questDao.updateGoal(goal.copy(
+                        currentValue = if (isCompleted) goal.targetValue else newValue,
+                        completed = isCompleted
+                    ))
+                }
             }
         }
     }

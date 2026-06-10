@@ -899,8 +899,9 @@ fun HorizonPlannerView(
     onUpdatePlan: (Task, String?) -> Unit,
     onComplete: (Task) -> Unit
 ) {
-    var selectedDayFilter by remember { mutableStateOf("Monday") }
     val daysList = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+    val currentDay = remember { java.text.SimpleDateFormat("EEEE", java.util.Locale.US).format(java.util.Date()) }
+    var selectedDayFilter by remember { mutableStateOf(if (daysList.contains(currentDay)) currentDay else "Monday") }
     
     val tasksForDay = remember(tasks, selectedDayFilter) {
         tasks.filter { !it.completed && it.plannedDay == selectedDayFilter }

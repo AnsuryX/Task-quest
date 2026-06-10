@@ -916,9 +916,10 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
         val task2Quad = 2 // Quadrant 2 (Important but not Urgent)
 
         val newGoalId = repository.insertGoal(Goal(title = goalTitle, sector = sector, targetValue = 50f)).toInt()
+        val currentDayOfWeek = java.text.SimpleDateFormat("EEEE", java.util.Locale.US).format(java.util.Date())
         
-        repository.insertTask(Task(title = task1Title, matrixQuadrant = task1Quad, sector = sector, xpReward = 40, targetPomodoros = 2, associatedGoalId = newGoalId))
-        repository.insertTask(Task(title = task2Title, matrixQuadrant = task2Quad, sector = sector, xpReward = 30, targetPomodoros = 2, associatedGoalId = newGoalId))
+        repository.insertTask(Task(title = task1Title, matrixQuadrant = task1Quad, sector = sector, xpReward = 40, targetPomodoros = 2, associatedGoalId = newGoalId, plannedDay = currentDayOfWeek))
+        repository.insertTask(Task(title = task2Title, matrixQuadrant = task2Quad, sector = sector, xpReward = 30, targetPomodoros = 2, associatedGoalId = newGoalId, plannedDay = currentDayOfWeek))
 
         return Pair(1, 2)
     }
@@ -926,6 +927,7 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
     fun autoForgeWithCoPilot(userFocusTopic: String, onCompleted: (String) -> Unit) {
         aiCoPilotLoading = true
         viewModelScope.launch {
+            val currentDayOfWeek = java.text.SimpleDateFormat("EEEE", java.util.Locale.US).format(java.util.Date())
             val customDirectives = if (chronosTrainingDirectives.isNotBlank()) {
                 "\n\n[USER CHRONOS TRAINING DIRECTIVES IN EFFECT - MAKE SURE YOUR OUTPUT ADHERES STRONGLY TO THIS PERSONALITY/STYLE]:\n$chronosTrainingDirectives"
             } else ""
@@ -1008,7 +1010,8 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
                                         sector = sector,
                                         xpReward = xp,
                                         targetPomodoros = targetPomos,
-                                        associatedGoalId = createdGoalId
+                                        associatedGoalId = createdGoalId,
+                                        plannedDay = currentDayOfWeek
                                     )
                                 )
                                 parsedTaskCount++
@@ -1045,7 +1048,8 @@ class QuestViewModel(private val repository: QuestRepository) : ViewModel() {
                                             sector = sector,
                                             xpReward = xp,
                                             targetPomodoros = targetPomos,
-                                            associatedGoalId = createdGoalId
+                                            associatedGoalId = createdGoalId,
+                                            plannedDay = currentDayOfWeek
                                         )
                                     )
                                     parsedTaskCount++

@@ -671,14 +671,6 @@ fun DashboardScreen(
 
                     Spacer(Modifier.height(14.dp))
 
-                    Text(
-                        text = "BEHAVIORAL MILESTONES (CHRONOS LOG)",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Black,
-                        color = NeonPurple,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-
                     val milestonesList = remember(tasks, pomodoroSessions, viewModel.chronosTrainingDirectives, tasksCompletedTodayList, focusMinsTodayCount) {
                         listOf(
                             Triple(
@@ -704,41 +696,78 @@ fun DashboardScreen(
                         )
                     }
 
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        milestonesList.forEach { (name, rule, achieved) ->
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = if (achieved) NeonGreen.copy(alpha = 0.05f) 
-                                                   else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
-                                ),
-                                border = BorderStroke(
-                                    0.5.dp, 
-                                    if (achieved) NeonGreen.copy(alpha = 0.4f) 
-                                    else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
-                                )
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(10.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = if (achieved) "❇️" else "🛑",
-                                        fontSize = 16.sp
+                    val achievedCount = remember(milestonesList) { milestonesList.count { it.third } }
+                    var milestonesExpanded by remember { mutableStateOf(false) }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { milestonesExpanded = !milestonesExpanded }
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("🌱", fontSize = 16.sp)
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                text = "BEHAVIORAL MILESTONES ($achievedCount/4 ACHIEVED)",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Black,
+                                color = NeonPurple
+                            )
+                        }
+                        Icon(
+                            imageVector = if (milestonesExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = "Toggle Milestones",
+                            tint = NeonPurple,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = milestonesExpanded,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(top = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            milestonesList.forEach { (name, rule, achieved) ->
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (achieved) NeonGreen.copy(alpha = 0.05f) 
+                                                       else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
+                                    ),
+                                    border = BorderStroke(
+                                        0.5.dp, 
+                                        if (achieved) NeonGreen.copy(alpha = 0.4f) 
+                                        else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
                                     )
-                                    Spacer(Modifier.width(8.dp))
-                                    Column {
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
                                         Text(
-                                            text = name,
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (achieved) NeonGreen else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                                            text = if (achieved) "❇️" else "🛑",
+                                            fontSize = 16.sp
                                         )
-                                        Text(
-                                            text = rule,
-                                            fontSize = 10.sp,
-                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        Column {
+                                            Text(
+                                                text = name,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (achieved) NeonGreen else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                                            )
+                                            Text(
+                                                text = rule,
+                                                fontSize = 10.sp,
+                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                            )
+                                        }
                                     }
                                 }
                             }
